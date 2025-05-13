@@ -1,0 +1,21 @@
+modules = ["python-3.11"]
+
+[nix]
+channel = "stable-24_05"
+packages = ["iana-etc", "libev"]
+
+[workflows]
+runButton = "Run"
+
+[[workflows.workflow]]
+name = "Run"
+mode = "sequential"
+author = 42583426
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gunicorn --worker-class eventlet --workers 1 --bind 0.0.0.0:5000 --timeout 120 main:app"
+
+[[ports]]
+localPort = 5000
+externalPort = 80

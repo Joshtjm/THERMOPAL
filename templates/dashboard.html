@@ -1,0 +1,455 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="flex flex-col items-center p-4 bg-gray-50">
+  <h2 class="text-xl font-bold mb-4">WBGT Tracker</h2>
+  <div class="text-sm text-gray-600 mb-4">Logged in as: {{ username }} ({{ user.role }})</div>
+
+  <!-- Timer Circle -->
+  <div class="relative w-48 h-48">
+    <svg class="absolute top-0 left-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" stroke="#e5e7eb" stroke-width="10" fill="none" />
+      <circle id="progress-ring" cx="50" cy="50" r="45" 
+        stroke="{% if user.zone == 'white' %}#4B5563{% elif user.zone == 'green' %}#10B981{% elif user.zone == 'yellow' %}#FBBF24{% elif user.zone == 'red' %}#EF4444{% elif user.zone == 'black' %}#1F2937{% else %}#10b981{% endif %}" 
+        stroke-width="10" fill="none"
+        stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" />
+    </svg>
+    <div class="absolute inset-0 flex flex-col items-center justify-center">
+      <div id="countdown" class="text-3xl font-bold {% if user.zone %}text-{{ user.zone }}-600{% else %}text-gray-700{% endif %}">--:--</div>
+      <div class="text-sm mt-1 font-semibold" id="zone_name_display">
+        {% if user.zone %}Zone: {{ user.zone.title() }}{% endif %}
+      </div>
+      <div class="text-sm mt-1 text-center">
+        <div id="time_display">
+          {% if user.start_time and user.end_time %}
+          <div>Start: <span class="font-semibold">{{ user.start_time }}</span></div>
+          <div>End: <span class="font-semibold">{{ user.end_time }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Section -->
+  <div class="absolute top-4 right-4 w-64">
+    <div class="flex space-x-2 mb-4">
+      <input type="text" id="location_name" placeholder="Location name" class="flex-1 p-2 border rounded">
+      <button onclick="saveCurrentLocation()" class="bg-blue-500 text-white px-4 py-2 rounded">Save</button>
+    </div>
+    <select id="saved_locations" class="w-full p-2 border rounded mb-4">
+      <option value="">Select saved location</option>
+    </select>
+    <div id="current_location" class="text-sm text-gray-600 mb-4"></div>
+  </div>
+
+  <!-- WBGT Zone Selector -->
+  <h3 class="mt-6 text-lg font-semibold">WBGT Zones</h3>
+  {% if system_status.cut_off %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+      <strong class="font-bold">Cut-Off Mode Active!</strong>
+      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+    </div>
+  {% elif system_status.cut_off_end_time %}
+    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4">
+      <strong class="font-bold">Mandatory Rest Period</strong>
+      <p class="text-sm">Normal activities will resume after: {{ system_status.cut_off_end_time }}</p>
+    </div>
+  {% endif %}
+
+  <div class="w-full max-w-xs space-y-2" {% if system_status.cut_off or (system_status.cut_off_end_time and user.role == 'Trainer') %}style="pointer-events: none; opacity: 0.5"{% endif %}>
+    {% if user.role == 'Trainer' %}
+      <button onclick="startTestCycle()" 
+        class="w-full p-4 rounded shadow text-left bg-purple-500 text-white hover:scale-[1.02] transition">
+        <div class="font-bold text-lg">Test Cycle</div>
+        <div class="text-sm">Work: 10 secs · Rest: 20 secs</div>
+      </button>
+    {% endif %}
+
+    {% for key, z in zones.items() %}
+      {% if (user.role != 'Trainer') or (key != 'cut-off') %}
+        <button onclick="startZone('{{ key }}')"
+          class="w-full p-4 rounded shadow text-left
+          {% if key == 'white' %}bg-white text-black
+          {% elif key == 'green' %}bg-green-400 text-white
+          {% elif key == 'yellow' %}bg-yellow-300 text-black
+          {% elif key == 'red' %}bg-red-400 text-white
+          {% elif key == 'black' %}bg-black text-white
+          {% endif %}
+          hover:scale-[1.02] transition">
+          <div class="font-bold text-lg">{{ key.title() }}</div>
+          <div class="text-sm">Work: {{ z.work }} mins · Rest: {{ z.rest }} mins</div>
+        </button>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<script src="/static/notifications.js"></script>
+<script>
+  // Set the current user variable
+  currentUser = "{{ username }}";
+  userRole = "{{ user.role }}";
+
+  // Rest of your dashboard.html JavaScript code...
+</script>
+<script>
+// Define updateDashboard function first so it's available for all function calls
+function updateDashboard() {
+  fetch('/get_updates')
+    .then(response => response.json())
+    .then(data => {
+      const userData = data.users['{{ username }}'];
+      if (userData) {
+        // Update zone display
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay) {
+          zoneDisplay.innerHTML = userData.zone ? `Zone: ${userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1)}` : '';
+        }
+
+        // Handle timer
+        if (userData.status === 'working' && userData.end_time) {
+          startTimer(userData.end_time);
+        } else if (userData.status === 'resting' && userData.end_time) {
+          startTimer(userData.end_time);
+        } else {
+          clearTimer();
+        }
+
+        // Show rest prompt if work completed
+        if (userData.work_completed && userData.pending_rest) {
+          showRestPrompt();
+        }
+      }
+
+      // Handle system status
+      const zoneButtons = document.querySelector('.w-full.max-w-xs');
+      if (zoneButtons) {
+        if (data.system_status.cut_off || (data.system_status.cut_off_end_time && '{{ user.role }}' === 'Trainer')) {
+          zoneButtons.style.pointerEvents = 'none';
+          zoneButtons.style.opacity = '0.5';
+        } else {
+          zoneButtons.style.pointerEvents = '';
+          zoneButtons.style.opacity = '';
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error updating dashboard:', error);
+    });
+}
+
+let currentPosition = null;
+let timerInterval = null;
+
+function clearTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  const countdown = document.getElementById("countdown");
+  const progress = document.getElementById("progress-ring");
+  if (countdown) countdown.textContent = "--:--";
+  if (progress) {
+    progress.style.transition = 'none';
+    progress.style.strokeDashoffset = 283;
+    // Force a reflow to ensure smooth animation on next start
+    progress.getBoundingClientRect();
+    progress.style.transition = 'stroke-dashoffset 1s linear';
+  }
+}
+
+let restPromptTimeout = null;
+let restNotificationInterval = null;
+
+function startTimer(endTimeStr) {
+  clearTimer();
+  if (!endTimeStr) return;
+
+  const endParts = endTimeStr.split(":");
+  const end = new Date();
+  end.setHours(parseInt(endParts[0]));
+  end.setMinutes(parseInt(endParts[1]));
+  end.setSeconds(parseInt(endParts[2]));
+
+  const progress = document.getElementById("progress-ring");
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  progress.style.strokeDasharray = `${circumference}`;
+
+  const totalSeconds = Math.max(0, Math.floor((end - new Date()) / 1000));
+  let remainingSeconds = totalSeconds;
+
+  timerInterval = setInterval(() => {
+    const now = new Date();
+    const diff = Math.floor((end - now) / 1000);
+    const mins = Math.floor(diff / 60);
+    const secs = diff % 60;
+
+    if (diff <= 0) {
+      clearTimer();
+      if ("{{ user.role }}" === "Trainer" && "{{ user.status }}" === "working") {
+        showRestPrompt();
+      }
+      return;
+    }
+
+    document.getElementById("countdown").textContent =
+      `${String(Math.max(mins, 0)).padStart(2, '0')}:${String(Math.max(secs, 0)).padStart(2, '0')}`;
+    progress.style.strokeDashoffset = circumference * (1 - diff / totalSeconds);
+  }, 1000);
+}
+
+function showRestPrompt() {
+  // Remove any existing prompt
+  const existingPrompt = document.getElementById('rest-prompt');
+  if (existingPrompt) {
+    existingPrompt.remove();
+  }
+
+  const promptDiv = document.createElement('div');
+  promptDiv.id = 'rest-prompt';
+  promptDiv.innerHTML = `
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-xl">
+        <h3 class="text-lg font-bold mb-4">Work Cycle Complete</h3>
+        <p class="mb-4">Would you like to start your rest cycle?</p>
+        <div class="flex justify-end space-x-4">
+          <button onclick="respondToRestPrompt(false)" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">No</button>
+          <button onclick="respondToRestPrompt(true)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Yes</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(promptDiv);
+
+  // Start the 3-minute countdown for mandatory rest
+  restPromptTimeout = setTimeout(() => {
+    if (document.getElementById('rest-prompt')) {
+      notifyUser('Rest Cycle Required', 'Please start your rest cycle now.');
+      notifyOfficers();
+    }
+  }, 180000); // 3 minutes
+}
+
+// Add manual rest start button
+function addManualRestButton() {
+  const existingButton = document.getElementById('manual-rest-button');
+  if (!existingButton) {
+    const btn = document.createElement('button');
+    btn.id = 'manual-rest-button';
+    btn.className = 'w-full p-4 rounded shadow text-left bg-blue-500 text-white hover:bg-blue-600 mt-4';
+    btn.innerHTML = `
+      <div class="font-bold text-lg">Start Rest Cycle</div>
+      <div class="text-sm">Begin your mandatory rest period</div>
+    `;
+    btn.onclick = () => respondToRestPrompt(true);
+    document.querySelector('.w-full.max-w-xs').appendChild(btn);
+  }
+}
+
+function respondToRestPrompt(startRest) {
+  const promptDiv = document.getElementById('rest-prompt');
+  if (promptDiv) {
+    promptDiv.remove();
+  }
+  clearTimeout(restPromptTimeout);
+
+  if (startRest) {
+    console.log("Starting rest cycle for {{ username }}");
+
+    fetch('/start_rest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}`
+    })
+    .then(response => {
+      console.log("Rest cycle response status:", response.status);
+      if (!response.ok) {
+        return response.text().then(text => {
+          try {
+            const data = JSON.parse(text);
+            throw new Error(data.error || `HTTP error ${response.status}`);
+          } catch (e) {
+            throw new Error(`HTTP error ${response.status}: ${text}`);
+          }
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        // Update time display immediately
+        document.getElementById('time_display').innerHTML = `
+          <div>Start: <span class="font-semibold">${data.start_time}</span></div>
+          <div>End: <span class="font-semibold">${data.end_time}</span></div>
+        `;
+        // Start timer immediately
+        startTimer(data.end_time);
+        // Update zone display (Rest)
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay && zoneDisplay.innerText) {
+          const currentZoneText = zoneDisplay.innerText;
+          if (!currentZoneText.includes('(Rest)')) {
+            zoneDisplay.innerHTML = `${currentZoneText} (Rest)`;
+          }
+        }
+        // Clear any existing rest notification intervals
+        if (restNotificationInterval) {
+          clearInterval(restNotificationInterval);
+          restNotificationInterval = null;
+        }
+      }
+    })
+    .catch(error => {
+      console.error("Error starting rest cycle:", error);
+      alert("Failed to start rest cycle: " + error.message);
+
+      // Re-show the prompt if there was an error
+      setTimeout(showRestPrompt, 1000);
+    });
+  } else {
+    // Add manual rest button when user clicks 'No'
+    addManualRestButton();
+    // Start notification interval
+    let reminderCount = 0;
+    restNotificationInterval = setInterval(() => {
+      reminderCount++;
+      if (reminderCount <= 6) { // Remind for 3 minutes (6 * 30 seconds)
+        notifyUser('Rest Reminder', 'Please start your rest cycle.');
+      } else {
+        clearInterval(restNotificationInterval);
+        notifyOfficers();
+      }
+    }, 30000); // Every 30 seconds
+  }
+}
+
+function notifyOfficers() {
+  notifyUser('User Alert', `{{ username }} has not started their rest cycle.`);
+}
+
+function startTestCycle() {
+  fetch('/test_cycle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username={{ username }}`
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => {
+        throw new Error(err.error || 'Failed to start test cycle');
+      });
+    }
+    return response.json();
+  })
+  .then(() => {
+    updateDashboard();
+  })
+  .catch(error => {
+    alert(error.message);
+  });
+}
+
+function updateLocationDisplay() {
+  if (currentPosition) {
+    document.getElementById('current_location').textContent = 
+      `Current location: ${currentPosition.coords.latitude.toFixed(6)}, ${currentPosition.coords.longitude.toFixed(6)}`;
+  }
+}
+
+function loadSavedLocations() {
+  fetch('/get_locations')
+    .then(response => response.json())
+    .then(locations => {
+      const select = document.getElementById('saved_locations');
+      select.innerHTML = '<option value="">Select saved location</option>';
+      for (const [name, coords] of Object.entries(locations)) {
+        select.innerHTML += `<option value="${coords.lat},${coords.lng}">${name}</option>`;
+      }
+    });
+}
+
+function saveCurrentLocation() {
+  const name = document.getElementById('location_name').value;
+  if (!name || !currentPosition) return;
+
+  fetch('/save_location', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name,
+      lat: currentPosition.coords.latitude,
+      lng: currentPosition.coords.longitude
+    })
+  }).then(() => {
+    loadSavedLocations();
+    document.getElementById('location_name').value = '';
+  });
+}
+
+function startZone(zone) {
+  const locationSelect = document.getElementById('saved_locations');
+  const location = locationSelect.value || 
+    (currentPosition ? `${currentPosition.coords.latitude},${currentPosition.coords.longitude}` : '');
+
+  fetch('/set_zone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username={{ username }}&zone=${zone}&location=${location}`
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => {
+        throw new Error(err.error || 'Failed to set zone');
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    // Immediately update UI with new data
+    if (data.start_time && data.end_time) {
+      document.getElementById('time_display').innerHTML = `
+        <div>Start: <span class="font-semibold">${data.start_time}</span></div>
+        <div>End: <span class="font-semibold">${data.end_time}</span></div>
+      `;
+    }
+    // Update zone display immediately
+    const zoneDisplay = document.getElementById('zone_name_display');
+    if (zoneDisplay) {
+      zoneDisplay.textContent = `Zone: ${zone.charAt(0).toUpperCase() + zone.slice(1)}`;
+    }
+    // Start timer immediately
+    if (data.end_time) {
+      startTimer(data.end_time);
+    }
+    // Update full dashboard in background
+    updateDashboard();
+  })
+  .catch(error => {
+    alert(error.message);
+  });
+}
+
+// Initialize the dashboard when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  // Get user location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        currentPosition = position;
+        updateLocationDisplay();
+      },
+      error => console.error('Geolocation error:', error)
+    );
+  }
+
+  // Load saved locations
+  loadSavedLocations();
+
+  // Update dashboard
+  updateDashboard();
+
+  // Set up periodic updates
+  setInterval(updateDashboard, 10000);  // Update every 10 seconds
+});
+</script>
+{% endblock %}
