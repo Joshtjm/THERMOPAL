@@ -14,7 +14,7 @@ author = 42583426
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "gunicorn --worker-class eventlet --workers 1 --bind 0.0.0.0:5000 --timeout 120 main:app"
+args = "gunicorn --worker-class eventlet --workers 1 --bind 0.0.0.0:5000 --timeout 300 --worker-connections 1000 main:app"
 
 [[ports]]
 localPort = 5000

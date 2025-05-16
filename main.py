@@ -23,12 +23,11 @@ socketio = SocketIO(app,
 
 @socketio.on('connect')
 def handle_connect():
-    print(f"Client connected: {request.sid}")
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print(f"Client disconnected: {request.sid}")
-    # Clean up any resources as needed
+    eventlet.spawn(lambda: print(f"Client disconnected: {request.sid}"))
 
 SG_TZ = pytz.timezone("Asia/Singapore")
 
@@ -66,13 +65,17 @@ def calculate_end(start, minutes):
     return start + timedelta(minutes=minutes)
 
 def save_locations():
-    with open('locations.json', 'w') as f:
-        json.dump(locations, f)
+    def _save():
+        with open('locations.json', 'w') as f:
+            json.dump(locations, f)
+    eventlet.spawn(_save)
 
 def load_locations():
     try:
-        with open('locations.json', 'r') as f:
-            return json.load(f)
+        def _load():
+            with open('locations.json', 'r') as f:
+                return json.load(f)
+        return eventlet.spawn(_load).wait()
     except:
         return {}
 
