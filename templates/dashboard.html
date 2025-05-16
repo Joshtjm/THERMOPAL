@@ -97,8 +97,8 @@
   currentUser = "{{ username }}";
   userRole = "{{ user.role }}";
   
-  // Socket.IO connection (if not defined elsewhere)
-  const socketio = io();
+  // Use the existing socket from notifications.js
+  const socketio = socket;
   
   // System status update handler
   socketio.on('system_status_update', function(data) {
