@@ -23,11 +23,11 @@ socketio = SocketIO(app,
 
 @socketio.on('connect')
 def handle_connect():
-    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+    print("Client connected:", request.sid)
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    eventlet.spawn(lambda: print(f"Client disconnected: {request.sid}"))
+    print("Client disconnected:", request.sid)
 
 SG_TZ = pytz.timezone("Asia/Singapore")
 
