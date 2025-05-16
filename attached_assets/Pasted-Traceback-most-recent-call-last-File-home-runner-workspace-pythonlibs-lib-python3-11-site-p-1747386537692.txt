@@ -1,0 +1,171 @@
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 76, in _load
+    with open('locations.json', 'r') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'locations.json'
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 26, in <lambda>
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+                                                      ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 26, in <lambda>
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+                                                      ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 26, in <lambda>
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+                                                      ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+System status after toggle: {'cut_off': True, 'mandatory_rest': False}
+User statuses: [{'joshus': {'status': 'idle', 'zone': None}}, {'daryl': {'status': 'monitoring', 'zone': None}}]
+System status after toggle: {'cut_off': False, 'mandatory_rest': True, 'cut_off_end_time': '2025-05-16 17:36:10'}
+User statuses: [{'joshus': {'status': 'idle', 'zone': None}}, {'daryl': {'status': 'monitoring', 'zone': None}}]
+server=b133aaf0-0756-4354-adf5-8e3b22a476dc-00-1k4s4wzsth4i8.spock.replit.dev//socket.io/ client=172.31.128.94:52208 socket shutdown error: [Errno 9] Bad file descriptorserver=b133aaf0-0756-4354-adf5-8e3b22a476dc-00-1k4s4wzsth4i8.spock.replit.dev//socket.io/ client=172.31.128.94:52186 socket shutdown error: [Errno 9] Bad file descriptorTraceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 30, in <lambda>
+    eventlet.spawn(lambda: print(f"Client disconnected: {request.sid}"))
+                                                         ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 30, in <lambda>
+    eventlet.spawn(lambda: print(f"Client disconnected: {request.sid}"))
+                                                         ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 76, in _load
+    with open('locations.json', 'r') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'locations.json'
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 26, in <lambda>
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+                                                      ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 473, in fire_timers
+    timer()
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/hubs/timer.py", line 59, in __call__
+    cb(*args, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/eventlet/greenthread.py", line 222, in main
+    result = function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/main.py", line 26, in <lambda>
+    eventlet.spawn(lambda: print(f"Client connected: {request.sid}"))
+                                                      ^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
