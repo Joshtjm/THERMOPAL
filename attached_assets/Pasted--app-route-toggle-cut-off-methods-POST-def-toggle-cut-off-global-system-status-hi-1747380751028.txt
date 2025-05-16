@@ -1,0 +1,69 @@
+@app.route('/toggle_cut_off', methods=['POST'])
+def toggle_cut_off():
+    global system_status, history_log, users
+    previous_state = system_status.get("cut_off", False)
+    system_status["cut_off"] = not previous_state
+    
+    try:
+        # If activating cut-off
+        if system_status["cut_off"]:
+            for username, user in users.items():
+                if user.get('role') == 'Trainer':
+                    # Set all trainers to idle status
+                    previous_status = user.get('status')
+                    previous_zone = user.get('zone')
+                    
+                    # Clear all user status and timing information
+                    user['status'] = 'idle'
+                    user['start_time'] = None
+                    user['end_time'] = None
+                    
+                    # Important: Also clear the zone!
+                    user['zone'] = None
+                    
+                    # Only add to history if they were active
+                    if previous_status in ['working', 'resting']:
+                        # Add to history
+                        timestamp = datetime.now(SG_TZ).strftime('%Y-%m-%d %H:%M:%S')
+                        history_log.append({
+                            'timestamp': timestamp,
+                            'username': username,
+                            'action': 'cut_off_activated',
+                            'zone': previous_zone,
+                            'details': 'Activity stopped by cut-off activation'
+                        })
+            
+            # Reset any mandatory rest period
+            system_status.pop("cut_off_end_time", None)
+                    
+        else:
+            # If deactivating cut-off, set mandatory rest period
+            current_time = datetime.now(SG_TZ)  # Use Singapore timezone
+            end_time = current_time + timedelta(minutes=30)
+            system_status["cut_off_end_time"] = end_time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Add to history
+            timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
+            history_log.append({
+                'timestamp': timestamp,
+                'action': 'mandatory_rest',
+                'details': 'Mandatory 30-minute rest period initiated'
+            })
+        
+        # Debug log
+        print(f"System status after toggle: {system_status}")
+        print(f"User statuses: {[{k: {'status': v.get('status'), 'zone': v.get('zone')}} for k, v in users.items()]}")
+        
+        # Emit system status update to all clients - use try/except to handle connection issues
+        try:
+            socketio.emit('system_status_update', system_status)
+            socketio.emit('user_update', {'users': users})
+            socketio.emit('history_update', {'history': history_log})
+        except Exception as e:
+            print(f"Error emitting updates: {e}")
+        
+        return jsonify({"status": "success", "cut_off": system_status["cut_off"]})
+    
+    except Exception as e:
+        print(f"Error in toggle_cut_off: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500

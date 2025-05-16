@@ -1,0 +1,69 @@
+function updateDashboard() {
+  fetch('/get_updates')
+    .then(response => response.json())
+    .then(data => {
+      const userData = data.users['{{ username }}'];
+      if (userData) {
+        // Update zone display
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay) {
+          zoneDisplay.innerHTML = userData.zone ? `Zone: ${userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1)}` : '';
+        }
+
+        // Update time display
+        const timeDisplay = document.getElementById('time_display');
+        if (timeDisplay && userData.start_time && userData.end_time) {
+          timeDisplay.innerHTML = `
+            <div>Start: <span class="font-semibold">${userData.start_time}</span></div>
+            <div>End: <span class="font-semibold">${userData.end_time}</span></div>
+          `;
+        }
+
+        // Update progress ring color
+        const progressRing = document.getElementById('progress-ring');
+        if (progressRing && userData.zone) {
+          const zoneColors = {
+            'white': '#4B5563',
+            'green': '#10B981',
+            'yellow': '#FBBF24',
+            'red': '#EF4444',
+            'black': '#1F2937',
+            'test': '#10b981'
+          };
+          const color = zoneColors[userData.zone] || '#10b981';
+          progressRing.setAttribute('stroke', color);
+        }
+
+        // Handle timer - MODIFIED PART
+        if ((userData.status === 'working' || userData.status === 'resting') && userData.end_time) {
+          // Only start the timer if it's not already running or if the end time has changed
+          if (!timerInterval || lastEndTime !== userData.end_time) {
+            lastEndTime = userData.end_time;
+            startTimer(userData.end_time);
+          }
+        } else if (userData.status === 'idle') {
+          clearTimer();
+        }
+
+        // Show rest prompt if work completed
+        if (userData.work_completed && userData.pending_rest) {
+          showRestPrompt();
+        }
+      }
+
+      // Handle system status
+      const zoneButtons = document.querySelector('.w-full.max-w-xs');
+      if (zoneButtons) {
+        if (data.system_status.cut_off || (data.system_status.cut_off_end_time && '{{ user.role }}' === 'Trainer')) {
+          zoneButtons.style.pointerEvents = 'none';
+          zoneButtons.style.opacity = '0.5';
+        } else {
+          zoneButtons.style.pointerEvents = '';
+          zoneButtons.style.opacity = '';
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error updating dashboard:', error);
+    });
+}

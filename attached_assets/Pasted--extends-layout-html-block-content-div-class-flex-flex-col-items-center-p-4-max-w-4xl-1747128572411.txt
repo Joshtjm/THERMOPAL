@@ -1,0 +1,281 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="flex flex-col items-center p-4 max-w-4xl mx-auto">
+  <h2 class="text-xl font-bold mb-4">WBGT Status Monitor</h2>
+  <div class="text-sm text-gray-600 mb-4">Logged in as: {{ username }} ({{ role }})</div>
+
+  <!-- Control Panel -->
+  <div class="w-full mb-6 space-y-4">
+    <!-- Cut-off Control -->
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-bold mb-2">System Control</h3>
+      <div class="flex flex-col sm:flex-row gap-4">
+        <button onclick="confirmCutOff()" class="flex-1 p-3 rounded text-white font-bold
+          {% if system_status.cut_off %}
+          bg-red-600 hover:bg-red-700
+          {% else %}
+          bg-green-600 hover:bg-green-700
+          {% endif %}">
+          {% if system_status.cut_off %}
+          Deactivate Cut-Off Mode
+          {% else %}
+          Activate Cut-Off Mode
+          {% endif %}
+        </button>
+        <button onclick="clearCommands()" class="flex-1 p-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded">
+          Clear Commands
+        </button>
+        <button onclick="resetLogs()" class="flex-1 p-3 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded">
+          Reset User Logs
+        </button>
+      </div>
+      {% if system_status.cut_off_end_time %}
+      <div class="mt-2 text-center text-red-600">
+        Mandatory rest until: {{ system_status.cut_off_end_time }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- WBGT Zone Control -->
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-bold mb-2">Modify WBGT Zones</h3>
+      <div class="flex flex-col sm:flex-row gap-4">
+        <div class="flex-1">
+          {% for user_id, user_data in users.items() %}
+            {% if user_data.get('role') == 'Trainer' %}
+            <div class="flex items-center p-2">
+              <input type="checkbox" id="user_{{ user_id }}" value="{{ user_id }}" class="user-checkbox mr-2">
+              <label for="user_{{ user_id }}">{{ user_id }}</label>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="flex flex-col gap-2">
+          {% for zone in zones %}
+            {% if zone != 'cut-off' %}
+            <button onclick="updateSelectedUsers('{{ zone }}')" 
+              class="p-2 rounded text-sm font-semibold
+              {% if zone == 'white' %}bg-white border border-gray-300 text-black
+              {% elif zone == 'green' %}bg-green-400 text-white
+              {% elif zone == 'yellow' %}bg-yellow-300 text-black
+              {% elif zone == 'red' %}bg-red-400 text-white
+              {% elif zone == 'black' %}bg-black text-white{% endif %}">
+              {{ zone|title }}
+            </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="w-full overflow-x-auto bg-white shadow rounded-lg">
+    <table class="min-w-full">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">End</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for user_id, user_data in users.items() %}
+          {% if user_data.get('role') == 'Trainer' %}
+            <tr>
+              <td class="px-4 py-3 text-sm">{{ user_id }}</td>
+              <td class="px-4 py-3 text-sm">{{ user_data.status|title }}</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 text-sm rounded
+                  {% if user_data.zone == 'white' %}bg-white border border-gray-300 text-black
+                  {% elif user_data.zone == 'green' %}bg-green-400 text-white
+                  {% elif user_data.zone == 'yellow' %}bg-yellow-300 text-black
+                  {% elif user_data.zone == 'red' %}bg-red-400 text-white
+                  {% elif user_data.zone == 'black' %}bg-black text-white
+                  {% elif user_data.zone == 'cut-off' %}bg-red-600 text-white{% endif %}">
+                  {{ user_data.zone|title if user_data.zone else '-' }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-sm">{{ user_data.get('start_time', '-') }}</td>
+              <td class="px-4 py-3 text-sm">{{ user_data.get('end_time', '-') }}</td>
+            </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- History Log -->
+  <div class="mt-8 w-full bg-white shadow rounded-lg overflow-hidden">
+    <h3 class="px-4 py-3 bg-gray-50 font-bold">Activity History</h3>
+    <div class="overflow-x-auto max-h-96">
+      <table class="min-w-full" id="history-table">
+        <thead class="bg-gray-50 sticky top-0">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/static/notifications.js"></script>
+  <script>
+    // Set the current user variable
+    currentUser = "{{ username }}";
+    userRole = "{{ role }}";
+
+    // Use the socket from notifications.js instead of creating a new one
+    socket.on('history_update', (data) => {
+      const tbody = document.querySelector('#history-table tbody');
+      tbody.innerHTML = data.history.map(entry => `
+        <tr>
+          <td class="px-4 py-3 text-sm">${entry.timestamp}</td>
+          <td class="px-4 py-3 text-sm">${entry.username}</td>
+          <td class="px-4 py-3 text-sm">${entry.action.replace('_', ' ')}</td>
+          <td class="px-4 py-3 text-sm">${entry.zone || '-'}</td>
+          <td class="px-4 py-3 text-sm">${
+            entry.action === 'completed_work' ? 'Work cycle completed' :
+            entry.action === 'start_rest' ? 'Started rest period' : ''
+          }</td>
+        </tr>
+      `).join('');
+    });
+  </script>
+</div>
+
+<script>
+function confirmCutOff() {
+  const action = "{{ system_status.cut_off }}" === "True" ? "deactivate" : "activate";
+  if (confirm(`Are you sure you want to ${action} Cut-Off mode?`)) {
+    if (action === "activate" && !confirm("This will stop all activities. Confirm again to proceed.")) {
+      return;
+    }
+    toggleCutOff();
+  }
+}
+
+function toggleCutOff() {
+  fetch('/toggle_cut_off', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username={{ username }}`
+  }).then(() => window.location.reload());
+}
+
+function clearCommands() {
+  if (confirm('Are you sure you want to clear all current commands?')) {
+    fetch('/clear_commands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}`
+    }).then(() => window.location.reload());
+  }
+}
+
+function resetLogs() {
+  if (confirm('Are you sure you want to reset all user logs?')) {
+    fetch('/reset_logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}`
+    }).then(() => window.location.reload());
+  }
+}
+
+function updateSelectedUsers(zone) {
+  const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+  if (!selectedUsers.length) {
+    alert('Please select at least one trainer');
+    return;
+  }
+
+  const locationSelect = document.getElementById('saved_locations');
+  const location = locationSelect ? locationSelect.value : '';
+
+  Promise.all(selectedUsers.map(user => 
+    fetch('/set_zone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}&target_user=${user}&zone=${zone}&location=${location}`
+    })
+  ))
+  .then(responses => Promise.all(responses.map(r => r.json())))
+  .then(results => {
+    const errors = results.filter(r => r.error);
+    if (errors.length) {
+      alert(errors[0].error);
+    }
+    fetchUpdates();
+  })
+  .catch(error => {
+    console.error('Error updating zones:', error);
+    alert('Failed to update zones. Please try again.');
+  });
+}
+
+function calculateTimeLeft(endTime) {
+  if (!endTime) return '-';
+  const now = new Date();
+  const end = new Date();
+  const [hours, minutes, seconds] = endTime.split(':');
+  end.setHours(hours, minutes, seconds);
+  const diff = end - now;
+  if (diff <= 0) return '0:00';
+  const minsLeft = Math.floor(diff / 60000);
+  const secsLeft = Math.floor((diff % 60000) / 1000);
+  return `${minsLeft}:${String(secsLeft).padStart(2, '0')}`;
+}
+
+function fetchUpdates() {
+  fetch('/get_updates')
+    .then(response => response.json())
+    .then(data => {
+      // Update user data in table
+      const tbody = document.querySelector('tbody');
+      tbody.innerHTML = '';
+      Object.entries(data.users).forEach(([userId, userData]) => {
+        if (userData.role === 'Trainer') {
+          const timeLeft = calculateTimeLeft(userData.end_time);
+          const row = `
+            <tr>
+              <td class="px-4 py-3 text-sm">
+                <input type="checkbox" class="user-checkbox mr-2" value="${userId}" id="user_${userId}">
+                <label for="user_${userId}">${userId}</label>
+              </td>
+              <td class="px-4 py-3 text-sm">${userData.status}</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 text-sm rounded
+                  ${userData.zone === 'white' ? 'bg-white border border-gray-300 text-black' : ''}
+                  ${userData.zone === 'green' ? 'bg-green-400 text-white' : ''}
+                  ${userData.zone === 'yellow' ? 'bg-yellow-300 text-black' : ''}
+                  ${userData.zone === 'red' ? 'bg-red-400 text-white' : ''}
+                  ${userData.zone === 'black' ? 'bg-black text-white' : ''}
+                  ${userData.zone === 'cut-off' ? 'bg-red-600 text-white' : ''}">
+                  ${userData.zone ? userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1) : '-'}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-sm">${userData.start_time || '-'}</td>
+              <td class="px-4 py-3 text-sm">${userData.end_time || '-'}</td>
+              <td class="px-4 py-3 text-sm">${timeLeft}</td>
+            </tr>`;
+          tbody.innerHTML += row;
+        }
+      });
+    });
+}
+
+// Auto-update every 5 seconds
+setInterval(fetchUpdates, 5000);
+// Initial fetch
+fetchUpdates();
+</script>
+{% endblock %}

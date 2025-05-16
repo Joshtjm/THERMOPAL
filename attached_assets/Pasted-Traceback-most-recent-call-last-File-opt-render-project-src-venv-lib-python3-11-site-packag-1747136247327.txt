@@ -1,0 +1,31 @@
+Traceback (most recent call last):
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/gunicorn/arbiter.py", line 208, in run
+    self.sleep()
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/gunicorn/arbiter.py", line 359, in sleep
+    ready = select.select([self.PIPE[0]], [], [], 1.0)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/green/select.py", line 80, in select
+    return hub.switch()
+           ^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 310, in switch
+    return self.greenlet.switch()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/hubs/hub.py", line 362, in run
+    self.wait(sleep_time)
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/hubs/poll.py", line 80, in wait
+    presult = self.do_poll(seconds)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/hubs/epolls.py", line 31, in do_poll
+    return self.poll.poll(seconds)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/gunicorn/arbiter.py", line 193, in signal
+    self.wakeup()
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/gunicorn/arbiter.py", line 334, in wakeup
+    os.write(self.PIPE[1], b'.')
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/green/os.py", line 74, in write
+    hubs.trampoline(fd, write=True)
+  File "/opt/render/project/src/.venv/lib/python3.11/site-packages/eventlet/hubs/__init__.py", line 139, in trampoline
+    raise RuntimeError('do not call blocking functions from the mainloop')
+RuntimeError: do not call blocking functions from the mainloop
+[2025-05-13 11:30:31 +0000] [85] [INFO] Worker exiting (pid: 85)
+Error: do not call blocking functions from the mainloop

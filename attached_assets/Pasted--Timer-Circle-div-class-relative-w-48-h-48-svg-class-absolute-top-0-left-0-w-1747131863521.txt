@@ -1,0 +1,44 @@
+  <!-- Timer Circle -->
+  <div class="relative w-48 h-48">
+    <svg class="absolute top-0 left-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" stroke="#e5e7eb" stroke-width="10" fill="none" />
+      <circle id="progress-ring" cx="50" cy="50" r="45" 
+        stroke="{% if user.zone == 'white' %}#4B5563{% elif user.zone == 'green' %}#10B981{% elif user.zone == 'yellow' %}#FBBF24{% elif user.zone == 'red' %}#EF4444{% elif user.zone == 'black' %}#1F2937{% else %}#10b981{% endif %}" 
+        stroke-width="10" fill="none"
+        stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" />
+    </svg>
+    <div class="absolute inset-0 flex flex-col items-center justify-center">
+      <div id="countdown" class="text-3xl font-bold {% if user.zone %}text-{{ user.zone }}-600{% else %}text-gray-700{% endif %}">--:--</div>
+      <div class="text-sm mt-1 font-semibold" id="zone_name_display">
+        {% if user.zone %}Zone: {{ user.zone.title() }}{% endif %}
+      </div>
+      <div class="text-sm mt-1 text-center">
+        <div id="time_display">
+          {% if user.start_time and user.end_time %}
+          <div>Start: <span class="font-semibold">{{ user.start_time }}</span></div>
+          <div>End: <span class="font-semibold">{{ user.end_time }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stop Button - Add this section -->
+  <div class="flex justify-center mb-4 mt-2" id="stop-button-container" style="display: none;">
+    <button id="stop-cycle-button" class="px-6 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600     transition focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+      Stop Cycle Early
+    </button>
+  </div>
+{% endif %}
+
+  <!-- Location Section -->
+  <div class="absolute top-4 right-4 w-64">
+    <div class="flex space-x-2 mb-4">
+      <input type="text" id="location_name" placeholder="Location name" class="flex-1 p-2 border rounded">
+      <button onclick="saveCurrentLocation()" class="bg-blue-500 text-white px-4 py-2 rounded">Save</button>
+    </div>
+    <select id="saved_locations" class="w-full p-2 border rounded mb-4">
+      <option value="">Select saved location</option>
+    </select>
+    <div id="current_location" class="text-sm text-gray-600 mb-4"></div>
+  </div>

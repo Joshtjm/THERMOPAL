@@ -1,0 +1,60 @@
+// Add this to your JavaScript
+socketio.on('system_status_update', function(data) {
+    // Update UI based on system status
+    const zoneButtons = document.querySelector('.w-full.max-w-xs');
+    
+    // Add or update cut-off warning
+    if (data.cut_off) {
+        // Check if warning already exists
+        let warning = document.querySelector('.bg-red-100');
+        if (!warning) {
+            warning = document.createElement('div');
+            warning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+            warning.innerHTML = '<strong class="font-bold">Cut-Off Mode Active!</strong>' +
+                               '<p class="text-sm">All activities must stop. Please wait for further instructions.</p>';
+            zoneButtons.parentNode.insertBefore(warning, zoneButtons);
+        }
+        
+        // Disable the zone buttons
+        if (zoneButtons) {
+            zoneButtons.style.pointerEvents = 'none';
+            zoneButtons.style.opacity = '0.5';
+        }
+    } else {
+        // Remove warning if it exists
+        const warning = document.querySelector('.bg-red-100');
+        if (warning) {
+            warning.remove();
+        }
+        
+        // If no mandatory rest, re-enable buttons
+        if (!data.cut_off_end_time || '{{ user.role }}' !== 'Trainer') {
+            if (zoneButtons) {
+                zoneButtons.style.pointerEvents = '';
+                zoneButtons.style.opacity = '';
+            }
+        }
+    }
+    
+    // Handle mandatory rest period
+    if (data.cut_off_end_time) {
+        // Check if rest warning already exists
+        let restWarning = document.querySelector('.bg-yellow-100');
+        if (!restWarning) {
+            restWarning = document.createElement('div');
+            restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+            restWarning.innerHTML = '<strong class="font-bold">Mandatory Rest Period</strong>' +
+                                   '<p class="text-sm">Normal activities will resume after: ' + data.cut_off_end_time + '</p>';
+            zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
+        } else {
+            // Update end time
+            restWarning.querySelector('p.text-sm').innerText = 'Normal activities will resume after: ' + data.cut_off_end_time;
+        }
+    } else {
+        // Remove rest warning if it exists
+        const restWarning = document.querySelector('.bg-yellow-100');
+        if (restWarning) {
+            restWarning.remove();
+        }
+    }
+});
