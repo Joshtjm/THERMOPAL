@@ -1,0 +1,573 @@
+// Define updateDashboard function first so it's available for all function calls
+function updateDashboard() {
+  fetch('/get_updates')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      const userData = data.users['{{ username }}'];
+      
+      if (userData) {
+        // Update zone display
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay) {
+          zoneDisplay.innerHTML = userData.zone ? `Zone: ${userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1)}` : '';
+        }
+        
+        // Add this block to update location
+        const currentLocation = document.getElementById('current_location');
+        if (currentLocation && userData.location) {
+          currentLocation.textContent = formatLocation(userData.location);
+        }
+        // Update time display
+        const timeDisplay = document.getElementById('time_display');
+        if (timeDisplay && userData.start_time && userData.end_time) {
+          timeDisplay.innerHTML = `
+            <div>Start: <span class="font-semibold">${userData.start_time}</span></div>
+            <div>End: <span class="font-semibold">${userData.end_time}</span></div>
+          `;
+        }
+        // Update progress ring color
+        const progressRing = document.getElementById('progress-ring');
+        if (progressRing && userData.zone) {
+          const zoneColors = {
+            'white': '#4B5563',
+            'green': '#10B981',
+            'yellow': '#FBBF24',
+            'red': '#EF4444',
+            'black': '#1F2937',
+            'test': '#10b981'
+          };
+          const color = zoneColors[userData.zone] || '#10b981';
+          progressRing.setAttribute('stroke', color);
+        }
+        // Handle timer - MODIFIED PART
+        if ((userData.status === 'working' || userData.status === 'resting') && userData.end_time) {
+          // Only start the timer if it's not already running or if the end time has changed
+          if (!timerInterval || lastEndTime !== userData.end_time) {
+            lastEndTime = userData.end_time;
+            startTimer(userData.end_time);
+          }
+
+          // Show stop button when cycle is active
+          const stopButtonContainer = document.getElementById('stop-button-container');
+          if (stopButtonContainer) {
+            stopButtonContainer.style.display = 'flex';
+          }
+        } else if (userData.status === 'idle') {
+          clearTimer();
+
+          // Hide stop button when idle
+          const stopButtonContainer = document.getElementById('stop-button-container');
+          if (stopButtonContainer) {
+            stopButtonContainer.style.display = 'none';
+          }
+        }
+        // Show rest prompt if work completed
+        if (userData.work_completed && userData.pending_rest) {
+          showRestPrompt();
+        }
+      }
+      // Handle system status
+      const zoneButtons = document.querySelector('.w-full.max-w-xs');
+      if (zoneButtons) {
+        if (data.system_status.cut_off || (data.system_status.cut_off_end_time && '{{ user.role }}' === 'Trainer')) {
+          zoneButtons.style.pointerEvents = 'none';
+          zoneButtons.style.opacity = '0.5';
+        } else {
+          zoneButtons.style.pointerEvents = '';
+          zoneButtons.style.opacity = '';
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error updating dashboard:', error);
+      setTimeout(updateDashboard, 5000); // Try again in 5 seconds if failed
+    });
+}
+
+// Add this variable at the top with your other global variables
+let lastEndTime = null;
+
+let currentPosition = null;
+let timerInterval = null;
+
+function clearTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  const countdown = document.getElementById("countdown");
+  const progress = document.getElementById("progress-ring");
+  if (countdown) countdown.textContent = "--:--";
+  if (progress) {
+    progress.style.transition = 'none';
+    progress.style.strokeDashoffset = 283;
+    // Force a reflow to ensure smooth animation on next start
+    progress.getBoundingClientRect();
+    progress.style.transition = 'stroke-dashoffset 1s linear';
+  }
+}
+
+let restPromptTimeout = null;
+let restNotificationInterval = null;
+
+function startTimer(endTimeStr) {
+  // If timer is already running with the same end time, don't restart it
+  if (timerInterval && lastEndTime === endTimeStr) {
+    return;
+  }
+
+  clearTimer();
+  if (!endTimeStr) return;
+
+  lastEndTime = endTimeStr;
+  const endParts = endTimeStr.split(":");
+  const end = new Date();
+  end.setHours(parseInt(endParts[0]));
+  end.setMinutes(parseInt(endParts[1]));
+  end.setSeconds(parseInt(endParts[2]));
+
+  const progress = document.getElementById("progress-ring");
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  progress.style.strokeDasharray = `${circumference}`;
+
+  const totalSeconds = Math.max(0, Math.floor((end - new Date()) / 1000));
+  let remainingSeconds = totalSeconds;
+
+  // Update immediately before setting interval
+  updateTimerDisplay(end, totalSeconds, circumference);
+
+  timerInterval = setInterval(() => {
+    updateTimerDisplay(end, totalSeconds, circumference);
+  }, 1000);
+}
+// Add this right after your variable declarations or other utility functions
+function formatLocation(locationString) {
+  if (!locationString) return "Not set";
+  
+  // If it's coordinates, format them nicely
+  if (locationString.includes(',')) {
+    const [lat, lng] = locationString.split(',');
+    // Round to 4 decimal places
+    const roundedLat = parseFloat(lat).toFixed(4);
+    const roundedLng = parseFloat(lng).toFixed(4);
+    return `${roundedLat}, ${roundedLng}`;
+  }
+  
+  return locationString;
+}
+// New helper function to update the timer display
+function updateTimerDisplay(end, totalSeconds, circumference) {
+  const now = new Date();
+  const diff = Math.floor((end - now) / 1000);
+
+  if (diff <= 0) {
+    clearTimer();
+    if ("{{ user.role }}" === "Trainer" && "{{ user.status }}" === "working") {
+      showRestPrompt();
+    }
+    return;
+  }
+
+  const mins = Math.floor(diff / 60);
+  const secs = diff % 60;
+
+  document.getElementById("countdown").textContent =
+    `${String(Math.max(mins, 0)).padStart(2, '0')}:${String(Math.max(secs, 0)).padStart(2, '0')}`;
+
+  const progress = document.getElementById("progress-ring");
+  if (progress) {
+    progress.style.strokeDashoffset = circumference * (1 - diff / totalSeconds);
+  }
+}
+
+function showRestPrompt() {
+  // Remove any existing prompt
+  const existingPrompt = document.getElementById('rest-prompt');
+  if (existingPrompt) {
+    existingPrompt.remove();
+  }
+
+  const promptDiv = document.createElement('div');
+  promptDiv.id = 'rest-prompt';
+  promptDiv.innerHTML = `
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-xl">
+        <h3 class="text-lg font-bold mb-4">Work Cycle Complete</h3>
+        <p class="mb-4">Would you like to start your rest cycle?</p>
+        <div class="flex justify-end space-x-4">
+          <button onclick="respondToRestPrompt(false)" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">No</button>
+          <button onclick="respondToRestPrompt(true)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Yes</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(promptDiv);
+
+  // Start the 3-minute countdown for mandatory rest
+  restPromptTimeout = setTimeout(() => {
+    if (document.getElementById('rest-prompt')) {
+      notifyUser('Rest Cycle Required', 'Please start your rest cycle now.');
+      notifyOfficers();
+    }
+  }, 180000); // 3 minutes
+}
+
+// Add manual rest start button
+function addManualRestButton() {
+  const existingButton = document.getElementById('manual-rest-button');
+  if (!existingButton) {
+    const btn = document.createElement('button');
+    btn.id = 'manual-rest-button';
+    btn.className = 'w-full p-4 rounded shadow text-left bg-blue-500 text-white hover:bg-blue-600 mt-4';
+    btn.innerHTML = `
+      <div class="font-bold text-lg">Start Rest Cycle</div>
+      <div class="text-sm">Begin your mandatory rest period</div>
+    `;
+    btn.onclick = () => respondToRestPrompt(true);
+    document.querySelector('.w-full.max-w-xs').appendChild(btn);
+  }
+}
+
+function respondToRestPrompt(startRest) {
+  const promptDiv = document.getElementById('rest-prompt');
+  if (promptDiv) {
+    promptDiv.remove();
+  }
+  clearTimeout(restPromptTimeout);
+
+  if (startRest) {
+    console.log("Starting rest cycle for {{ username }}");
+
+    fetch('/start_rest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}`
+    })
+    .then(response => {
+      console.log("Rest cycle response status:", response.status);
+      if (!response.ok) {
+        return response.text().then(text => {
+          try {
+            const data = JSON.parse(text);
+            throw new Error(data.error || `HTTP error ${response.status}`);
+          } catch (e) {
+            throw new Error(`HTTP error ${response.status}: ${text}`);
+          }
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        // Update time display immediately
+        document.getElementById('time_display').innerHTML = `
+          <div>Start: <span class="font-semibold">${data.start_time}</span></div>
+          <div>End: <span class="font-semibold">${data.end_time}</span></div>
+        `;
+        // Start timer immediately
+        startTimer(data.end_time);
+        // Update zone display (Rest)
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay && zoneDisplay.innerText) {
+          const currentZoneText = zoneDisplay.innerText;
+          if (!currentZoneText.includes('(Rest)')) {
+            zoneDisplay.innerHTML = `${currentZoneText} (Rest)`;
+          }
+        }
+        // Clear any existing rest notification intervals
+        if (restNotificationInterval) {
+          clearInterval(restNotificationInterval);
+          restNotificationInterval = null;
+        }
+      }
+    })
+    .catch(error => {
+      console.error("Error starting rest cycle:", error);
+      alert("Failed to start rest cycle: " + error.message);
+
+      // Re-show the prompt if there was an error
+      setTimeout(showRestPrompt, 1000);
+    });
+  } else {
+    // Add manual rest button when user clicks 'No'
+    addManualRestButton();
+    // Start notification interval
+    let reminderCount = 0;
+    restNotificationInterval = setInterval(() => {
+      reminderCount++;
+      if (reminderCount <= 6) { // Remind for 3 minutes (6 * 30 seconds)
+        notifyUser('Rest Reminder', 'Please start your rest cycle.');
+      } else {
+        clearInterval(restNotificationInterval);
+        notifyOfficers();
+      }
+    }, 30000); // Every 30 seconds
+  }
+}
+
+function notifyOfficers() {
+  notifyUser('User Alert', `{{ username }} has not started their rest cycle.`);
+}
+
+function startTestCycle() {
+  fetch('/test_cycle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username={{ username }}`
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => {
+        throw new Error(err.error || 'Failed to start test cycle');
+      });
+    }
+    return response.json();
+  })
+  .then(() => {
+    updateDashboard();
+  })
+  .catch(error => {
+    alert(error.message);
+  });
+}
+
+function startZone(zone) {
+  const locationSelect = document.getElementById('saved_locations');
+  const location = locationSelect.value || 
+    (currentPosition ? `${currentPosition.coords.latitude},${currentPosition.coords.longitude}` : '');
+
+  fetch('/set_zone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username={{ username }}&zone=${zone}&location=${location}`
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => {
+        throw new Error(err.error || 'Failed to set zone');
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    // Immediately update UI with new data
+    if (data.start_time && data.end_time) {
+      document.getElementById('time_display').innerHTML = `
+        <div>Start: <span class="font-semibold">${data.start_time}</span></div>
+        <div>End: <span class="font-semibold">${data.end_time}</span></div>
+      `;
+    }
+    // Update zone display immediately
+    const zoneDisplay = document.getElementById('zone_name_display');
+    if (zoneDisplay) {
+      zoneDisplay.textContent = `Zone: ${zone.charAt(0).toUpperCase() + zone.slice(1)}`;
+    }
+    // Start timer immediately
+    if (data.end_time) {
+      startTimer(data.end_time);
+    }
+    // Update full dashboard in background
+    updateDashboard();
+  })
+  .catch(error => {
+    alert(error.message);
+  });
+}
+
+// Function to stop cycle early
+function stopCycleEarly() {
+  // Check for mandatory rest period
+  fetch('/get_system_status')
+    .then(response => response.json())
+    .then(data => {
+      if (data.mandatory_rest && '{{ user.status }}' === 'resting') {
+        alert('Cannot end mandatory rest cycles early. Please wait for the rest period to complete.');
+        return;
+      }
+
+      // Continue with normal stop cycle process
+      if (confirm('Are you sure you want to end your current cycle early?')) {
+        fetch('/complete_cycle_early', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `username={{ username }}`
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Update UI
+            location.reload();
+          } else {
+            alert('Failed to end cycle: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(error => {
+          console.error('Error ending cycle:', error);
+          alert('An error occurred while trying to end the cycle.');
+        });
+      }
+    })
+    .catch(error => {
+      console.error('Error checking system status:', error);
+    });
+}
+
+
+// Get current GPS location
+function getLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      // Success callback
+      function(position) {
+        currentPosition = position;
+        updateLocationDisplay();
+      },
+      // Error callback
+      function(error) {
+        let errorMessage = "Unable to retrieve your location. ";
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "You denied the request for geolocation.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "The request to get location timed out.";
+            break;
+          case error.UNKNOWN_ERROR:
+            errorMessage += "An unknown error occurred.";
+            break;
+        }
+        
+        alert(errorMessage);
+      }
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+  }
+}
+
+// Format location for better display
+function formatLocation(locationString) {
+  if (!locationString) return "Not set";
+  
+  // If it's coordinates, format them nicely
+  if (locationString.includes(',')) {
+    const [lat, lng] = locationString.split(',');
+    // Round to 4 decimal places for cleaner display
+    const roundedLat = parseFloat(lat).toFixed(4);
+    const roundedLng = parseFloat(lng).toFixed(4);
+    return `${roundedLat}, ${roundedLng}`;
+  }
+  
+  return locationString;
+}
+
+// Update location display with improved formatting
+function updateLocationDisplay() {
+  const locationElement = document.getElementById('current_location');
+  if (!locationElement) return;
+  
+  if (currentPosition) {
+    const lat = currentPosition.coords.latitude;
+    const lng = currentPosition.coords.longitude;
+    locationElement.textContent = `Current location: ${formatLocation(lat + ',' + lng)}`;
+  } else {
+    locationElement.textContent = "Location not set";
+  }
+}
+
+// Clear the current location
+function clearLocation() {
+  currentPosition = null;
+  updateLocationDisplay();
+}
+
+// Load saved locations from server
+function loadSavedLocations() {
+  fetch('/get_locations')
+    .then(response => response.json())
+    .then(locations => {
+      const select = document.getElementById('saved_locations');
+      select.innerHTML = '<option value="">Select saved location</option>';
+      for (const [name, coords] of Object.entries(locations)) {
+        select.innerHTML += `<option value="${coords.lat},${coords.lng}">${name}</option>`;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading saved locations:', error);
+    });
+}
+
+// Save current location to server
+function saveCurrentLocation() {
+  const name = document.getElementById('location_name').value.trim();
+  
+  if (!name) {
+    alert("Please enter a location name.");
+    return;
+  }
+  
+  if (!currentPosition) {
+    alert("No location is currently set. Use 'Get GPS' first.");
+    return;
+  }
+
+  fetch('/save_location', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name,
+      lat: currentPosition.coords.latitude,
+      lng: currentPosition.coords.longitude
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    return response.json();
+  })
+  .then(data => {
+    loadSavedLocations();
+    document.getElementById('location_name').value = '';
+    alert(`Location "${name}" saved successfully.`);
+  })
+  .catch(error => {
+    console.error('Error saving location:', error);
+    alert('Error saving location. Please try again.');
+  });
+}
+
+// Initialize location features
+document.addEventListener('DOMContentLoaded', function() {
+  // Load saved locations
+  loadSavedLocations();
+  
+  // Add change event listener to the dropdown
+  const dropdown = document.getElementById('saved_locations');
+  if (dropdown) {
+    dropdown.addEventListener('change', function() {
+      const selectedValue = this.value;
+      if (selectedValue) {
+        const [lat, lng] = selectedValue.split(',');
+        // Create a mock position object to match the format
+        currentPosition = {
+          coords: {
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng)
+          }
+        };
+        updateLocationDisplay();
+      }
+    });
+  }
+});

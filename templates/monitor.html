@@ -189,13 +189,13 @@ function calculateTimeLeft(endTime) {
 // Helper function to update history table
 function updateHistoryTable(history) {
   if (!history || !history.length) return;
-  
+
   const historyTbody = document.querySelector('#history-table tbody');
   if (!historyTbody) return;
-  
+
   // Get the latest 10 entries
   const latestEntries = history.slice(-10).reverse();
-  
+
   historyTbody.innerHTML = latestEntries.map(entry => `
     <tr>
       <td class="px-4 py-3 text-sm">${entry.timestamp}</td>
@@ -215,7 +215,7 @@ function updateHistoryTable(history) {
 // Helper function to update system status indicators
 function updateSystemStatus(status) {
   if (!status) return;
-  
+
   const cutOffButton = document.querySelector('button[onclick="confirmCutOff()"]');
   if (cutOffButton && status.cut_off) {
     cutOffButton.textContent = 'Deactivate Cut-Off Mode';
@@ -226,11 +226,11 @@ function updateSystemStatus(status) {
     cutOffButton.classList.remove('bg-red-600', 'hover:bg-red-700');
     cutOffButton.classList.add('bg-green-600', 'hover:bg-green-700');
   }
-  
+
   // Update cut-off end time message
   const cutOffMessageContainer = document.querySelector('button[onclick="confirmCutOff()"]').parentNode;
   const cutOffMessage = cutOffMessageContainer.querySelector('div.mt-2.text-center.text-red-600');
-  
+
   if (status.cut_off_end_time) {
     if (cutOffMessage) {
       cutOffMessage.textContent = `Mandatory rest until: ${status.cut_off_end_time}`;
@@ -251,38 +251,38 @@ function fetchUpdates() {
     .then(data => {
       // Update user data in table
       const tbody = document.querySelector('tbody');
-      
+
       // Create a map of existing rows for faster access
       const existingRows = {};
       Array.from(tbody.querySelectorAll('tr')).forEach(row => {
         const userId = row.querySelector('.user-checkbox')?.value;
         if (userId) existingRows[userId] = row;
       });
-      
+
       // Create or update rows for each trainer
       const updatedUserIds = [];
       Object.entries(data.users).forEach(([userId, userData]) => {
         if (userData.role === 'Trainer') {
           updatedUserIds.push(userId);
           const timeLeft = calculateTimeLeft(userData.end_time);
-          
+
           if (existingRows[userId]) {
             // Update existing row
             const row = existingRows[userId];
             const cells = row.querySelectorAll('td');
-            
+
             // Update status
             cells[1].textContent = userData.status;
-            
+
             // Update zone
             const zoneSpan = cells[2].querySelector('span');
             zoneSpan.className = `px-2 py-1 text-sm rounded ${getZoneClass(userData.zone)}`;
             zoneSpan.textContent = userData.zone ? userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1) : '-';
-            
+
             // Update times
             cells[3].textContent = userData.start_time || '-';
             cells[4].textContent = userData.end_time || '-';
-            
+
             // Update time left
             cells[5].textContent = timeLeft;
           } else {
@@ -307,19 +307,19 @@ function fetchUpdates() {
           }
         }
       });
-      
+
       // Remove rows for users who are no longer present
       Object.keys(existingRows).forEach(userId => {
         if (!updatedUserIds.includes(userId)) {
           existingRows[userId].remove();
         }
       });
-      
+
       // Update history table
       if (data.history) {
         updateHistoryTable(data.history);
       }
-      
+
       // Update system status
       updateSystemStatus(data.system_status);
     })
@@ -381,36 +381,25 @@ function clearCommands() {
 }
 
 function resetLogs() {
-    if (confirm('Are you sure you want to reset all user logs?')) {
-        fetch('/reset_logs', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === "success") {
-                // Update UI to reflect cleared logs
-                const historyTable = document.querySelector('.activity-history-table tbody');
-                if (historyTable) {
-                    historyTable.innerHTML = '';
-                }
-                alert('Logs reset successfully');
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error resetting logs:', error);
-            alert('An error occurred while resetting logs');
-        });
-    }
+  if (confirm('Are you sure you want to reset all user logs?')) {
+    fetch('/reset_logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username={{ username }}`
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        fetchUpdates(); // Update the UI without reloading
+      } else {
+        alert('Failed to reset logs');
+      }
+    })
+    .catch(error => {
+      console.error('Error resetting logs:', error);
+      alert('An error occurred while resetting logs');
+    });
+  }
 }
 
 function updateSelectedUsers(zone) {

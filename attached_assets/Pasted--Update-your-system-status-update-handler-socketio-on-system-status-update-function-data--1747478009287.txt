@@ -1,0 +1,112 @@
+// Update your system_status_update handler
+socketio.on('system_status_update', function(data) {
+  console.log("System status update received:", data);
+  
+  // Update UI based on system status
+  const zoneButtons = document.querySelector('.w-full.max-w-xs');
+  const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
+  
+  // First, remove any existing notifications from the page
+  const existingCutOffWarning = document.querySelector('.bg-red-100');
+  if (existingCutOffWarning) {
+    existingCutOffWarning.remove();
+  }
+  
+  const existingRestWarning = document.querySelector('.bg-yellow-100');
+  if (existingRestWarning) {
+    existingRestWarning.remove();
+  }
+
+  // Handle stop button visibility
+  const stopButtonContainer = document.getElementById('stop-button-container');
+  
+  // Handle cut-off mode
+  if (data.cut_off === true) {
+    console.log("Cut-off mode is active, updating UI");
+    
+    // Create and insert the cut-off warning
+    const cutOffWarning = document.createElement('div');
+    cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+    cutOffWarning.innerHTML = `
+      <strong class="font-bold">Cut-Off Mode Active!</strong>
+      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+    `;
+    
+    // Insert in the right location
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(cutOffWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(cutOffWarning, zoneButtons);
+    }
+
+    // Disable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+    
+    // Clear any active timer
+    if (window.timerInterval) {
+      clearTimer();
+      window.lastZone = null;
+      lastEndTime = null;
+    }
+    
+    // Hide stop button if visible
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Handle mandatory rest period
+  else if (data.cut_off_end_time) {
+    console.log("Mandatory rest period is active, updating UI");
+    
+    // Create and insert the rest warning
+    const restWarning = document.createElement('div');
+    restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+    
+    // Format the time for better readability
+    let endTime = new Date();
+    let timeParts = data.cut_off_end_time.split(':');
+    endTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2] || 0));
+    let formattedTime = endTime.toLocaleTimeString();
+    
+    restWarning.innerHTML = `
+      <strong class="font-bold">Mandatory Rest Period</strong>
+      <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
+    `;
+    
+    // Insert in the right location
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(restWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
+    }
+    
+    // Disable zone buttons for trainers
+    if (zoneButtons && '{{ user.role }}' === 'Trainer') {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+    
+    // IMPORTANT CHANGE: Hide stop button during mandatory rest
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Normal operation - no warnings
+  else {
+    console.log("Normal operation, removing warnings");
+    
+    // Re-enable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = '';
+      zoneButtons.style.opacity = '';
+    }
+    
+    // Make sure dashboard is updated with current state
+    if (!window.timerInterval) {
+      updateDashboard();
+    }
+  }
+});

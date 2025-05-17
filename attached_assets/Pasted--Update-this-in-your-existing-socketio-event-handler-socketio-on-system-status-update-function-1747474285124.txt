@@ -1,0 +1,91 @@
+// Update this in your existing socketio event handler
+socketio.on('system_status_update', function(data) {
+  // Update UI based on system status
+  const zoneButtons = document.querySelector('.w-full.max-w-xs');
+  const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
+  
+  // Clear any existing warnings first
+  const existingCutOffWarning = document.querySelector('.bg-red-100');
+  if (existingCutOffWarning) {
+    existingCutOffWarning.remove();
+  }
+  
+  const existingRestWarning = document.querySelector('.bg-yellow-100');
+  if (existingRestWarning) {
+    existingRestWarning.remove();
+  }
+
+  // Handle cut-off mode
+  if (data.cut_off) {
+    // Create and insert the cut-off warning
+    const cutOffWarning = document.createElement('div');
+    cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+    cutOffWarning.innerHTML = `
+      <strong class="font-bold">Cut-Off Mode Active!</strong>
+      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+    `;
+    
+    // Insert after the zones heading
+    if (zonesHeading) {
+      zonesHeading.insertAdjacentElement('afterend', cutOffWarning);
+    }
+
+    // Disable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+    
+    // Clear any active timer
+    if (timerInterval) {
+      clearTimer();
+      window.lastZone = null;
+      lastEndTime = null;
+    }
+    
+    // Hide stop button if visible
+    const stopButtonContainer = document.getElementById('stop-button-container');
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Handle mandatory rest period
+  else if (data.cut_off_end_time) {
+    // Create and insert the rest warning
+    const restWarning = document.createElement('div');
+    restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+    
+    // Format the time for better readability
+    let endTime = new Date(data.cut_off_end_time);
+    let formattedTime = endTime.toLocaleTimeString();
+    
+    restWarning.innerHTML = `
+      <strong class="font-bold">Mandatory Rest Period</strong>
+      <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
+    `;
+    
+    // Insert after the zones heading
+    if (zonesHeading) {
+      zonesHeading.insertAdjacentElement('afterend', restWarning);
+    }
+    
+    // Disable zone buttons for trainers
+    if (zoneButtons && '{{ user.role }}' === 'Trainer') {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+  } 
+  // Normal operation - no warnings
+  else {
+    // Re-enable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = '';
+      zoneButtons.style.opacity = '';
+    }
+    
+    // Make sure dashboard is updated with current state
+    if (!timerInterval) {
+      updateDashboard();
+    }
+  }
+});

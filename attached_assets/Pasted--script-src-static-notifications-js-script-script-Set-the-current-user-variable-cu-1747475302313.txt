@@ -1,0 +1,131 @@
+<script src="/static/notifications.js"></script>
+<script>
+  // Set the current user variable
+  currentUser = "{{ username }}";
+  userRole = "{{ user.role }}";
+  const socketio = socket;
+
+  // Add this at the beginning of your socket.io script section
+  // Check if socket.io is properly connected
+  socket.on('connect', function() {
+    console.log('Socket.io connected successfully');
+  });
+
+  socket.on('connect_error', function(error) {
+    console.error('Socket.io connection error:', error);
+  });
+
+  socket.on('disconnect', function(reason) {
+    console.warn('Socket.io disconnected:', reason);
+  });
+
+  // This will log all incoming socket events for debugging
+  socket.onAny((event, ...args) => {
+    console.log(`Received socket event: ${event}`, args);
+  });
+  
+  // Add this after your other socketio setup code
+socketio.on('system_status_update', function(data) {
+  console.log("System status update received:", data);
+  
+  // Update UI based on system status
+  const zoneButtons = document.querySelector('.w-full.max-w-xs');
+  const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
+  
+  // First, remove any existing notifications from the page
+  // This includes both dynamically added and server-rendered notifications
+  const existingCutOffWarning = document.querySelector('.bg-red-100');
+  if (existingCutOffWarning) {
+    existingCutOffWarning.remove();
+  }
+  
+  const existingRestWarning = document.querySelector('.bg-yellow-100');
+  if (existingRestWarning) {
+    existingRestWarning.remove();
+  }
+
+  // Handle cut-off mode
+  if (data.cut_off === true) {
+    console.log("Cut-off mode is active, updating UI");
+    
+    // Create and insert the cut-off warning with exact styling matching the template
+    const cutOffWarning = document.createElement('div');
+    cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+    cutOffWarning.innerHTML = `
+      <strong class="font-bold">Cut-Off Mode Active!</strong>
+      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+    `;
+    
+    // Insert in the right location - need precise placement
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(cutOffWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(cutOffWarning, zoneButtons);
+    }
+
+    // Disable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+    
+    // Clear any active timer
+    if (window.timerInterval) {
+      clearTimer();
+      window.lastZone = null;
+      lastEndTime = null;
+    }
+    
+    // Hide stop button if visible
+    const stopButtonContainer = document.getElementById('stop-button-container');
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Handle mandatory rest period
+  else if (data.cut_off_end_time) {
+    console.log("Mandatory rest period is active, updating UI");
+    
+    // Create and insert the rest warning
+    const restWarning = document.createElement('div');
+    restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+    
+    // Format the time for better readability
+    let endTime = new Date(data.cut_off_end_time);
+    let formattedTime = endTime.toLocaleTimeString();
+    
+    restWarning.innerHTML = `
+      <strong class="font-bold">Mandatory Rest Period</strong>
+      <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
+    `;
+    
+    // Insert in the right location
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(restWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
+    }
+    
+    // Disable zone buttons for trainers
+    if (zoneButtons && '{{ user.role }}' === 'Trainer') {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+  } 
+  // Normal operation - no warnings
+  else {
+    console.log("Normal operation, removing warnings");
+    
+    // Re-enable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = '';
+      zoneButtons.style.opacity = '';
+    }
+    
+    // Make sure dashboard is updated with current state
+    if (!window.timerInterval) {
+      updateDashboard();
+    }
+  }
+});
+</script>

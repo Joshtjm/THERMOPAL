@@ -1,0 +1,193 @@
+<script src="/static/notifications.js"></script>
+<script>
+  // Set the current user variable
+  currentUser = "{{ username }}";
+  userRole = "{{ user.role }}";
+  const socketio = socket;
+
+  // Ensure we reconnect if the connection is lost
+  socket.io.on("reconnect", (attempt) => {
+    console.log(`Socket.io reconnected after ${attempt} attempts`);
+    // Force a status refresh when reconnecting
+    fetchSystemStatus();
+  });
+
+  socket.io.on("reconnect_attempt", (attempt) => {
+    console.log(`Socket.io reconnection attempt: ${attempt}`);
+  });
+
+  socket.io.on("error", (error) => {
+    console.error("Socket.io error:", error);
+  });
+
+  // Check if socket.io is properly connected
+  socketio.on('connect', function() {
+    console.log('Socket.io connected successfully');
+    // Force a status refresh when initially connecting
+    fetchSystemStatus();
+  });
+
+  socketio.on('connect_error', function(error) {
+    console.error('Socket.io connection error:', error);
+  });
+
+  socketio.on('disconnect', function(reason) {
+    console.warn('Socket.io disconnected:', reason);
+    
+    // Start periodic polling when disconnected
+    startPolling();
+  });
+
+  // This will log all incoming socket events for debugging
+  socketio.onAny((event, ...args) => {
+    console.log(`Received socket event: ${event}`, args);
+  });
+  
+  // Add system status update handler
+  socketio.on('system_status_update', function(data) {
+    console.log("System status update received:", data);
+    updateSystemStatusUI(data);
+  });
+
+  // Create a separate function to update the UI based on system status
+  function updateSystemStatusUI(data) {
+    // Update UI based on system status
+    const zoneButtons = document.querySelector('.w-full.max-w-xs');
+    const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
+    
+    // First, remove any existing notifications from the page
+    // This includes both dynamically added and server-rendered notifications
+    const existingCutOffWarning = document.querySelector('.bg-red-100');
+    if (existingCutOffWarning) {
+      existingCutOffWarning.remove();
+    }
+    
+    const existingRestWarning = document.querySelector('.bg-yellow-100');
+    if (existingRestWarning) {
+      existingRestWarning.remove();
+    }
+
+    // Handle cut-off mode
+    if (data.cut_off === true) {
+      console.log("Cut-off mode is active, updating UI");
+      
+      // Create and insert the cut-off warning with exact styling matching the template
+      const cutOffWarning = document.createElement('div');
+      cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+      cutOffWarning.innerHTML = `
+        <strong class="font-bold">Cut-Off Mode Active!</strong>
+        <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+      `;
+      
+      // Insert in the right location - need precise placement
+      if (zonesHeading && zonesHeading.nextElementSibling) {
+        zonesHeading.parentNode.insertBefore(cutOffWarning, zonesHeading.nextElementSibling);
+      } else if (zoneButtons) {
+        zoneButtons.parentNode.insertBefore(cutOffWarning, zoneButtons);
+      }
+
+      // Disable zone buttons
+      if (zoneButtons) {
+        zoneButtons.style.pointerEvents = 'none';
+        zoneButtons.style.opacity = '0.5';
+      }
+      
+      // Clear any active timer
+      if (window.timerInterval) {
+        clearTimer();
+        window.lastZone = null;
+        lastEndTime = null;
+      }
+      
+      // Hide stop button if visible
+      const stopButtonContainer = document.getElementById('stop-button-container');
+      if (stopButtonContainer) {
+        stopButtonContainer.style.display = 'none';
+      }
+    } 
+    // Handle mandatory rest period
+    else if (data.cut_off_end_time) {
+      console.log("Mandatory rest period is active, updating UI");
+      
+      // Create and insert the rest warning
+      const restWarning = document.createElement('div');
+      restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+      
+      // Format the time for better readability
+      let endTime = new Date(data.cut_off_end_time);
+      let formattedTime = endTime.toLocaleTimeString();
+      
+      restWarning.innerHTML = `
+        <strong class="font-bold">Mandatory Rest Period</strong>
+        <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
+      `;
+      
+      // Insert in the right location
+      if (zonesHeading && zonesHeading.nextElementSibling) {
+        zonesHeading.parentNode.insertBefore(restWarning, zonesHeading.nextElementSibling);
+      } else if (zoneButtons) {
+        zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
+      }
+      
+      // Disable zone buttons for trainers
+      if (zoneButtons && '{{ user.role }}' === 'Trainer') {
+        zoneButtons.style.pointerEvents = 'none';
+        zoneButtons.style.opacity = '0.5';
+      }
+    } 
+    // Normal operation - no warnings
+    else {
+      console.log("Normal operation, removing warnings");
+      
+      // Re-enable zone buttons
+      if (zoneButtons) {
+        zoneButtons.style.pointerEvents = '';
+        zoneButtons.style.opacity = '';
+      }
+      
+      // Make sure dashboard is updated with current state
+      if (!window.timerInterval) {
+        updateDashboard();
+      }
+    }
+  }
+
+  // Fetch system status via AJAX as a fallback
+  function fetchSystemStatus() {
+    fetch('/get_system_status')
+      .then(response => response.json())
+      .then(data => {
+        console.log("Fetched system status:", data);
+        updateSystemStatusUI(data);
+      })
+      .catch(error => {
+        console.error("Error fetching system status:", error);
+      });
+  }
+
+  // Polling mechanism for when socket connection is lost
+  let pollingInterval = null;
+  
+  function startPolling() {
+    if (!pollingInterval) {
+      console.log("Starting polling for updates");
+      pollingInterval = setInterval(fetchSystemStatus, 5000); // Poll every 5 seconds
+    }
+  }
+  
+  function stopPolling() {
+    if (pollingInterval) {
+      console.log("Stopping polling for updates");
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  // When reconnected, stop polling
+  socketio.on('connect', function() {
+    stopPolling();
+  });
+  
+  // Initial status check at page load
+  fetchSystemStatus();
+</script>

@@ -1,0 +1,165 @@
+function updateDashboard() {
+  fetch('/get_updates')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      const userData = data.users['{{ username }}'];
+      if (userData) {
+        // Update zone display
+        const zoneDisplay = document.getElementById('zone_name_display');
+        if (zoneDisplay) {
+          zoneDisplay.innerHTML = userData.zone ? `Zone: ${userData.zone.charAt(0).toUpperCase() + userData.zone.slice(1)}` : '';
+        }
+        // Update time display
+        const timeDisplay = document.getElementById('time_display');
+        if (timeDisplay && userData.start_time && userData.end_time) {
+          timeDisplay.innerHTML = `
+            <div>Start: <span class="font-semibold">${userData.start_time}</span></div>
+            <div>End: <span class="font-semibold">${userData.end_time}</span></div>
+          `;
+        }
+        // Update progress ring color
+        const progressRing = document.getElementById('progress-ring');
+        if (progressRing && userData.zone) {
+          const zoneColors = {
+            'white': '#4B5563',
+            'green': '#10B981',
+            'yellow': '#FBBF24',
+            'red': '#EF4444',
+            'black': '#1F2937',
+            'test': '#10b981'
+          };
+          const color = zoneColors[userData.zone] || '#10b981';
+          progressRing.setAttribute('stroke', color);
+        }
+        // Handle timer - MODIFIED PART
+        if ((userData.status === 'working' || userData.status === 'resting') && userData.end_time) {
+          // Only start the timer if it's not already running or if the end time has changed
+          if (!timerInterval || lastEndTime !== userData.end_time) {
+            lastEndTime = userData.end_time;
+            startTimer(userData.end_time);
+          }
+          
+          // Show stop button when cycle is active
+          const stopButtonContainer = document.getElementById('stop-button-container');
+          if (stopButtonContainer) {
+            stopButtonContainer.style.display = 'flex';
+          }
+        } else if (userData.status === 'idle') {
+          clearTimer();
+          
+          // Hide stop button when idle
+          const stopButtonContainer = document.getElementById('stop-button-container');
+          if (stopButtonContainer) {
+            stopButtonContainer.style.display = 'none';
+          }
+        }
+        // Show rest prompt if work completed
+        if (userData.work_completed && userData.pending_rest) {
+          showRestPrompt();
+        }
+      }
+      // Handle system status
+      const zoneButtons = document.querySelector('.w-full.max-w-xs');
+      if (zoneButtons) {
+        if (data.system_status.cut_off || (data.system_status.cut_off_end_time && '{{ user.role }}' === 'Trainer')) {
+          zoneButtons.style.pointerEvents = 'none';
+          zoneButtons.style.opacity = '0.5';
+        } else {
+          zoneButtons.style.pointerEvents = '';
+          zoneButtons.style.opacity = '';
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error updating dashboard:', error);
+      setTimeout(updateDashboard, 5000); // Try again in 5 seconds if failed
+    });
+}
+
+// Add this variable at the top with your other global variables
+let lastEndTime = null;
+
+let currentPosition = null;
+let timerInterval = null;
+
+function clearTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  const countdown = document.getElementById("countdown");
+  const progress = document.getElementById("progress-ring");
+  if (countdown) countdown.textContent = "--:--";
+  if (progress) {
+    progress.style.transition = 'none';
+    progress.style.strokeDashoffset = 283;
+    // Force a reflow to ensure smooth animation on next start
+    progress.getBoundingClientRect();
+    progress.style.transition = 'stroke-dashoffset 1s linear';
+  }
+}
+
+let restPromptTimeout = null;
+let restNotificationInterval = null;
+
+function startTimer(endTimeStr) {
+  // If timer is already running with the same end time, don't restart it
+  if (timerInterval && lastEndTime === endTimeStr) {
+    return;
+  }
+  
+  clearTimer();
+  if (!endTimeStr) return;
+
+  lastEndTime = endTimeStr;
+  const endParts = endTimeStr.split(":");
+  const end = new Date();
+  end.setHours(parseInt(endParts[0]));
+  end.setMinutes(parseInt(endParts[1]));
+  end.setSeconds(parseInt(endParts[2]));
+
+  const progress = document.getElementById("progress-ring");
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  progress.style.strokeDasharray = `${circumference}`;
+
+  const totalSeconds = Math.max(0, Math.floor((end - new Date()) / 1000));
+  let remainingSeconds = totalSeconds;
+
+  // Update immediately before setting interval
+  updateTimerDisplay(end, totalSeconds, circumference);
+
+  timerInterval = setInterval(() => {
+    updateTimerDisplay(end, totalSeconds, circumference);
+  }, 1000);
+}
+
+// New helper function to update the timer display
+function updateTimerDisplay(end, totalSeconds, circumference) {
+  const now = new Date();
+  const diff = Math.floor((end - now) / 1000);
+  
+  if (diff <= 0) {
+    clearTimer();
+    if ("{{ user.role }}" === "Trainer" && "{{ user.status }}" === "working") {
+      showRestPrompt();
+    }
+    return;
+  }
+
+  const mins = Math.floor(diff / 60);
+  const secs = diff % 60;
+  
+  document.getElementById("countdown").textContent =
+    `${String(Math.max(mins, 0)).padStart(2, '0')}:${String(Math.max(secs, 0)).padStart(2, '0')}`;
+  
+  const progress = document.getElementById("progress-ring");
+  if (progress) {
+    progress.style.strokeDashoffset = circumference * (1 - diff / totalSeconds);
+  }
+}
