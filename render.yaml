@@ -1,6 +1,6 @@
 services:
 - type: web
-  name: wbgt-tracker
+  name: THERMOPAL
   env: python
   buildCommand: "pip install -r requirements.txt"
   startCommand: "gunicorn -k eventlet -w 1 main:app"
