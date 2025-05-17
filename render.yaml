@@ -1,0 +1,12 @@
+services:
+- type: web
+  name: wbgt-tracker
+  env: python
+  buildCommand: "pip install -r requirements.txt"
+  startCommand: "gunicorn -k eventlet -w 1 main:app"
+  envVars:
+    - key: SECRET_KEY
+      value: your-secret-key-goes-here
+  autoDeploy: true
+  plan: free
+  healthCheckPath: /
