@@ -30,13 +30,17 @@ history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
 def log_activity(username, action, zone=None):
-    timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    history_log.append({
-        "timestamp": timestamp,
-        "username": username,
-        "action": action,
-        "zone": zone
-    })
+    timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S %z")
+    try:
+        history_log.append({
+            "timestamp": timestamp,
+            "username": username,
+            "action": action,
+            "zone": zone
+        })
+        socketio.emit('history_update', {'history': history_log})
+    except Exception as e:
+        print(f"Error logging activity: {e}")
 
 def is_authority(role):
     return role == "Conducting Body"
