@@ -305,15 +305,21 @@ def start_rest():
     if not zone:
         return jsonify({"error": "No active WBGT zone"}), 400
 
-    # Set rest duration based on zone
+    # Set rest duration based on zone with exact timing
+    # Reset seconds to zero for exact time tracking
+    now_exact = now.replace(microsecond=0, second=0)
+    
     if zone == "test":
         rest_seconds = 20
-        end_time = (now + timedelta(seconds=rest_seconds)).strftime("%H:%M:%S")
+        end_time_obj = now_exact + timedelta(seconds=rest_seconds)
     else:
         rest_minutes = WBGT_ZONES[zone]["rest"]
-        end_time = (now + timedelta(minutes=rest_minutes)).strftime("%H:%M:%S")
-
-    start_time = now.strftime("%H:%M:%S")
+        # Use the calculate_end function for exact minutes timing
+        end_time_obj = calculate_end(now_exact, rest_minutes)
+    
+    # Format times with consistent precision
+    start_time = now_exact.strftime("%H:%M:%S")
+    end_time = end_time_obj.strftime("%H:%M:%S")
 
     # Update user status to resting
     users[username].update({
@@ -324,7 +330,8 @@ def start_rest():
         "pending_rest": False
     })
 
-    log_activity(username, "start_rest", zone)
+    # Log the activity with the exact same timestamp as the start time
+    log_activity(username, "start_rest", zone, now_exact.strftime("%Y-%m-%d %H:%M:%S"))
 
     print(f"Rest cycle started for {username}: {start_time} to {end_time}")
 

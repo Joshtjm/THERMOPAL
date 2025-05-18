@@ -284,7 +284,7 @@ function startTimer(startTime, endTime, zone) {
   // Clear any existing timer
   clearTimer();
   
-  // Parse times
+  // Parse times with exact precision (no milliseconds)
   const startDate = parseTimeString(startTime);
   const endDate = parseTimeString(endTime);
   
@@ -296,11 +296,24 @@ function startTimer(startTime, endTime, zone) {
   const timerElement = document.getElementById('timer');
   if (!timerElement) return;
   
+  // Calculate initial exact duration in minutes and seconds
+  // This ensures we show the exact specified duration from the server
+  const totalDurationMs = endDate - startDate;
+  const exactMinutes = Math.floor(totalDurationMs / 60000);
+  const exactSeconds = Math.floor((totalDurationMs % 60000) / 1000);
+  
+  // Set initial timer display to exact duration if we're just starting
+  const now = new Date();
+  // If we're within 1 second of the start time, show the exact duration
+  if (Math.abs(now - startDate) < 1000) {
+    timerElement.textContent = `${exactMinutes}:${exactSeconds.toString().padStart(2, '0')}`;
+  }
+  
   // Update timer every second
   timerInterval = setInterval(() => {
     const now = new Date();
     
-    // Calculate time remaining
+    // Calculate time remaining with exact precision
     const timeLeft = Math.max(0, endDate - now);
     const minutes = Math.floor(timeLeft / 60000);
     const seconds = Math.floor((timeLeft % 60000) / 1000);
@@ -317,8 +330,7 @@ function startTimer(startTime, endTime, zone) {
     }
   }, 1000);
   
-  // Also update immediately
-  const now = new Date();
+  // Also update immediately for current time
   const timeLeft = Math.max(0, endDate - now);
   const minutes = Math.floor(timeLeft / 60000);
   const seconds = Math.floor((timeLeft % 60000) / 1000);
@@ -354,20 +366,22 @@ function clearTimer() {
   }
 }
 
-// Parse a time string into a Date object
+// Parse a time string into a Date object with exact precision
 function parseTimeString(timeStr) {
   if (!timeStr) return new Date();
   
   const now = new Date();
   const [hours, minutes, seconds] = timeStr.split(':').map(Number);
   
+  // Create a new date with seconds precision, no milliseconds
   return new Date(
     now.getFullYear(),
     now.getMonth(),
     now.getDate(),
     hours || 0,
     minutes || 0,
-    seconds || 0
+    seconds || 0,
+    0  // explicitly set milliseconds to 0 for exact timing
   );
 }
 
