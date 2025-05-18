@@ -137,7 +137,7 @@
 
   socketio.on('disconnect', function(reason) {
     console.warn('Socket.io disconnected:', reason);
-    
+
     // Start periodic polling when disconnected
     startPolling();
   });
@@ -146,7 +146,7 @@
   socketio.onAny((event, ...args) => {
     console.log(`Received socket event: ${event}`, args);
   });
-  
+
   // Add system status update handler
   socketio.on('system_status_update', function(data) {
     console.log("System status update received:", data);
@@ -180,17 +180,17 @@
   // Create a separate function to update the UI based on system status
   function updateSystemStatusUI(data) {
   console.log("Updating system status UI with:", data);
-  
+
   // Update UI based on system status
   const zoneButtons = document.querySelector('.w-full.max-w-xs');
   const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
-  
+
   // First, remove any existing notifications from the page
   const existingCutOffWarning = document.querySelector('.bg-red-100');
   if (existingCutOffWarning) {
     existingCutOffWarning.remove();
   }
-  
+
   const existingRestWarning = document.querySelector('.bg-yellow-100');
   if (existingRestWarning) {
     existingRestWarning.remove();
@@ -216,7 +216,7 @@
   // Handle cut-off mode
   if (data.cut_off === true) {
     console.log("Cut-off mode is active, updating UI");
-    
+
     // Create and insert the cut-off warning
     const cutOffWarning = document.createElement('div');
     cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
@@ -224,7 +224,7 @@
       <strong class="font-bold">Cut-Off Mode Active!</strong>
       <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
     `;
-    
+
     // Insert in the right location
     if (zonesHeading && zonesHeading.nextElementSibling) {
       zonesHeading.parentNode.insertBefore(cutOffWarning, zonesHeading.nextElementSibling);
@@ -237,14 +237,14 @@
       zoneButtons.style.pointerEvents = 'none';
       zoneButtons.style.opacity = '0.5';
     }
-    
+
     // Clear any active timer
     if (window.timerInterval) {
       clearTimer();
       window.lastZone = null;
       lastEndTime = null;
     }
-    
+
     // Hide stop button if visible
     if (stopButtonContainer) {
       stopButtonContainer.style.display = 'none';
@@ -253,11 +253,11 @@
   // Handle mandatory rest period
   else if (data.cut_off_end_time) {
     console.log("Mandatory rest period is active, updating UI");
-    
+
     // Create and insert the rest warning
     const restWarning = document.createElement('div');
     restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
-    
+
     // Format the time for better readability
     let endTime = new Date();
     if (typeof data.cut_off_end_time === 'string') {
@@ -271,25 +271,25 @@
       }
     }
     let formattedTime = endTime.toLocaleTimeString();
-    
+
     restWarning.innerHTML = `
       <strong class="font-bold">Mandatory Rest Period</strong>
       <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
     `;
-    
+
     // Insert in the right location
     if (zonesHeading && zonesHeading.nextElementSibling) {
       zonesHeading.parentNode.insertBefore(restWarning, zonesHeading.nextElementSibling);
     } else if (zoneButtons) {
       zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
     }
-    
+
     // Disable zone buttons for trainers
     if (zoneButtons && '{{ user.role }}' === 'Trainer') {
       zoneButtons.style.pointerEvents = 'none';
       zoneButtons.style.opacity = '0.5';
     }
-    
+
     // IMPORTANT CHANGE: Hide stop button during mandatory rest
     if (stopButtonContainer) {
       stopButtonContainer.style.display = 'none';
@@ -298,18 +298,18 @@
   // Normal operation - no warnings
   else {
     console.log("Normal operation, removing warnings");
-    
+
     // Re-enable zone buttons
     if (zoneButtons) {
       zoneButtons.style.pointerEvents = '';
       zoneButtons.style.opacity = '';
     }
-    
+
     // Make sure dashboard is updated with current state
     if (!window.timerInterval) {
       updateDashboard();
     }
-    
+
     // Restore the stop button if there's an active timer
     if (window.timerInterval && stopButtonContainer) {
       stopButtonContainer.style.display = 'flex';
@@ -332,14 +332,14 @@
 
   // Polling mechanism for when socket connection is lost
   let pollingInterval = null;
-  
+
   function startPolling() {
     if (!pollingInterval) {
       console.log("Starting polling for updates");
       pollingInterval = setInterval(fetchSystemStatus, 5000); // Poll every 5 seconds
     }
   }
-  
+
   function stopPolling() {
     if (pollingInterval) {
       console.log("Stopping polling for updates");
@@ -352,7 +352,7 @@
   socketio.on('connect', function() {
     stopPolling();
   });
-  
+
   // Initial status check at page load
   fetchSystemStatus();
 </script>
@@ -364,12 +364,12 @@ function updateDashboard() {
     .then(data => {
       const userData = data.users['{{ username }}'];
       const systemStatus = data.system_status;
-      
+
       if (userData) {
         // Keep track of the current zone to detect changes
         const currentZone = userData.zone;
         const hasZoneChanged = window.lastZone !== currentZone;
-        
+
         // Update zone display
         const zoneDisplay = document.getElementById('zone_name_display');
         if (zoneDisplay) {
@@ -408,14 +408,14 @@ function updateDashboard() {
           // - zone has changed
           if (!timerInterval || lastEndTime !== userData.end_time || hasZoneChanged) {
             console.log("Restarting timer - Zone changed:", hasZoneChanged, "End time changed:", lastEndTime !== userData.end_time);
-            
+
             // Always clear the timer first to ensure clean state
             clearTimer();
-            
+
             // Update the lastEndTime and lastZone
             lastEndTime = userData.end_time;
             window.lastZone = currentZone;
-            
+
             // Start a new timer
             startTimer(userData.end_time);
           }
@@ -490,7 +490,7 @@ let restNotificationInterval = null;
 
 function startTimer(endTimeStr) {
   clearTimer(); // Make sure to clear any existing timer
-  
+
   if (!endTimeStr) return;
 
   const endParts = endTimeStr.split(":");
@@ -500,10 +500,10 @@ function startTimer(endTimeStr) {
   end.setSeconds(parseInt(endParts[2]));
 
   const now = new Date();
-  
+
   // Calculate total seconds from current time to end time
   const totalSeconds = Math.max(0, Math.floor((end - now) / 1000));
-  
+
   const progress = document.getElementById("progress-ring");
   const radius = 45;
   const circumference = 2 * Math.PI * radius;

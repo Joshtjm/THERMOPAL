@@ -147,7 +147,7 @@ if (window.historyUpdateListener) {
 window.historyUpdateListener = (data) => {
   const tbody = document.querySelector('#history-table tbody');
   if (!tbody) return;
-  
+
   tbody.innerHTML = (data.history || []).map(entry => `
     <tr>
       <td class="px-4 py-3 text-sm">${entry.timestamp}</td>
