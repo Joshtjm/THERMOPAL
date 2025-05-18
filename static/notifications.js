@@ -48,13 +48,16 @@ function notifyUser(title, message) {
 socket.on('work_complete', (data) => {
   // Only handle events if currentUser is defined
   if (currentUser && data.user === currentUser) {
-    if (confirm('Work cycle complete. Start rest period now?')) {
-      fetch('/start_rest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `username=${currentUser}`
-      });
-    }
+    // Add a small delay before showing the prompt to prevent immediate triggering
+    setTimeout(() => {
+      if (confirm('Work cycle complete. Start rest period now?')) {
+        fetch('/start_rest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `username=${currentUser}`
+        });
+      }
+    }, 500); // 500ms delay to prevent instant prompting
   }
 });
 
