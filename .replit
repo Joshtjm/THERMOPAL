@@ -5,7 +5,7 @@ channel = "stable-24_05"
 packages = ["iana-etc", "libev", "openssl", "postgresql"]
 
 [workflows]
-runButton = "Project"
+runButton = "Run"
 
 [[workflows.workflow]]
 name = "Run"
