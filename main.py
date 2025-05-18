@@ -29,8 +29,9 @@ locations = {}
 history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
-def log_activity(username, action, zone=None):
-    timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
+def log_activity(username, action, zone=None, custom_timestamp=None):
+    # Use custom timestamp if provided, otherwise use current time
+    timestamp = custom_timestamp or datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
     history_log.append({
         "timestamp": timestamp,
         "username": username,
@@ -45,7 +46,9 @@ def sg_now():
     return datetime.now(SG_TZ)
 
 def calculate_end(start, minutes):
-    return start + timedelta(minutes=minutes)
+    # Calculate exact end time without extra seconds
+    # Using exact minutes to prevent any extra seconds in the duration
+    return start + timedelta(minutes=minutes, seconds=0)
 
 def save_locations():
     with open('locations.json', 'w') as f:
@@ -96,8 +99,11 @@ def toggle_cut_off():
     if username not in users or not is_authority(users[username]["role"]):
         return jsonify({"error": "Unauthorized"}), 401
 
+    print(f"Toggle cut-off requested by {username}")
+
     now = sg_now()
     if system_status["cut_off"]:
+        print("Deactivating cut-off mode, starting mandatory rest")
         system_status["cut_off"] = False
         system_status["cut_off_end_time"] = (now + timedelta(minutes=30)).strftime("%H:%M:%S")
         for user_id, user_data in users.items():
@@ -107,6 +113,7 @@ def toggle_cut_off():
                 user_data["start_time"] = now.strftime("%H:%M:%S")
                 user_data["end_time"] = (now + timedelta(minutes=30)).strftime("%H:%M:%S")
     else:
+        print("Activating cut-off mode")
         system_status["cut_off"] = True
         system_status["cut_off_end_time"] = None
         for user_id, user_data in users.items():
@@ -116,7 +123,18 @@ def toggle_cut_off():
                 user_data["start_time"] = None
                 user_data["end_time"] = None
 
-    return jsonify({"success": True})
+    # Emit updates to all clients via Socket.IO
+    try:
+        print(f"Emitting system_status_update: {system_status}")
+        socketio.emit('system_status_update', system_status)
+        socketio.emit('user_update', {'users': users})
+
+        # Add a direct page refresh notification 
+        socketio.emit('force_refresh')
+    except Exception as e:
+        print(f"Error emitting socketio updates: {e}")
+
+    return jsonify({"success": True, "system_status": system_status})
 
 @app.route("/reset_logs", methods=["POST"])
 def reset_logs():
@@ -140,21 +158,31 @@ def clear_commands():
     if username not in users or not is_authority(users[username]["role"]):
         return jsonify({"error": "Unauthorized"}), 401
 
-    global system_status
-    system_status = {"cut_off": False, "cut_off_end_time": None}
+    # Clear cut-off AND mandatory rest period
+    system_status["cut_off"] = False
+    system_status["cut_off_end_time"] = None  # Make sure this is set to None
 
-    # Reset all trainers to idle state
+    # Reset all trainer statuses to idle
     for user_id, user_data in users.items():
         if user_data["role"] == "Trainer":
-            user_data.update({
-                "status": "idle",
-                "zone": None,
-                "start_time": None,
-                "end_time": None
-            })
+            user_data["status"] = "idle"
+            user_data["zone"] = None
+            user_data["start_time"] = None
+            user_data["end_time"] = None
+
+    # Add debug logging
+    print("Commands cleared, cut_off_end_time set to None")
+    print(f"System status after clear: {system_status}")
+
+    # Emit the updated status immediately
+    try:
+        socketio.emit('system_status_update', system_status)
+        socketio.emit('user_update', {'users': users})
+        socketio.emit('force_refresh')  # Force client refresh
+    except Exception as e:
+        print(f"Error emitting updates after clear_commands: {e}")
 
     return jsonify({"success": True})
-
 @app.route("/set_zone", methods=["POST"])
 def set_zone():
     username = request.form.get("username")
@@ -319,7 +347,7 @@ def check_user_cycles(now):
             if now >= end_time:
                 if not user_data.get("work_completed"):
                     zone = user_data.get("zone")
-                    print(f"Work cycle completed for {user_id}, zone: {zone}")
+                    print(f"Work Cycle completed for {user_id}, zone: {zone}")
                     log_activity(user_id, "completed_work", zone)
 
                     # Mark work as completed
@@ -405,12 +433,38 @@ def complete_cycle_early():
 
     return jsonify({'error': 'User not found'}), 404
 
-# Instead of this:
-if __name__ == "__main__":
-    locations = load_locations()
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+@app.route('/get_system_status')
+def get_system_status():
+    print(f"Returning system status: {system_status}")
+    return jsonify(system_status)
 
-# Change to this:
+@app.route("/stop_cycle", methods=["POST"])
+def stop_cycle():
+    username = request.form.get("username")
+    if username not in users:
+        return jsonify({"error": "User not found"}), 404
+
+    # Check if this is during a mandatory rest period after cut-off
+    if system_status.get("cut_off_end_time") and users[username]["status"] == "resting":
+        return jsonify({"error": "Cannot stop mandatory rest period"}), 403
+    # NEW CHECK: Prevent stopping any rest cycle
+    if users[username]["status"] == "resting":
+        return jsonify({"error": "Cannot stop rest cycle"}), 403
+    # Normal stop cycle logic continues here
+    users[username]["status"] = "idle"
+    users[username]["zone"] = None
+    users[username]["start_time"] = None
+    users[username]["end_time"] = None
+
+    # Add to activity history
+    now = sg_now()
+    append_activity_history(username, "Work Cycle ended early by user", now.strftime("%H:%M:%S"))
+
+    # Send real-time updates
+    socketio.emit("user_update", {"users": users})
+
+    return jsonify({"success": True})
+
 if __name__ == "__main__":
     locations = load_locations()
     # For local development only

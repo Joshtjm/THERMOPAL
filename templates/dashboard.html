@@ -1,4 +1,3 @@
-
 {% extends "layout.html" %}
 {% block content %}
 <div class="flex flex-col items-center p-4 bg-gray-50">
@@ -49,46 +48,58 @@
     <div id="current_location" class="text-sm text-gray-600 mb-4"></div>
   </div>
 
-  <!-- WBGT Zone Selector -->
-  <h3 class="mt-6 text-lg font-semibold">WBGT Zones</h3>
-  {% if system_status.cut_off %}
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-      <strong class="font-bold">Cut-Off Mode Active!</strong>
-      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
-    </div>
-  {% elif system_status.cut_off_end_time %}
-    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4">
-      <strong class="font-bold">Mandatory Rest Period</strong>
-      <p class="text-sm">Normal activities will resume after: {{ system_status.cut_off_end_time }}</p>
-    </div>
+<!-- WBGT Zone Selector -->
+<h3 class="mt-6 text-lg font-semibold">WBGT Zones</h3>
+{% if system_status.cut_off %}
+  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+    <strong class="font-bold">Cut-Off Mode Active!</strong>
+    <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+  </div>
+{% elif system_status.cut_off_end_time %}
+  <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4">
+    <strong class="font-bold">Mandatory Rest Period</strong>
+    <p class="text-sm">Normal activities will resume after: {{ system_status.cut_off_end_time }}</p>
+  </div>
+{% endif %}
+
+<div class="w-full max-w-xs space-y-2" {% if system_status.cut_off or (system_status.cut_off_end_time and user.role == 'Trainer') %}style="pointer-events: none; opacity: 0.5"{% endif %}>
+  {% if user.role == 'Trainer' %}
+    <button onclick="startTestCycle()" 
+      class="w-full p-4 rounded shadow text-left bg-purple-500 text-white hover:scale-[1.02] transition">
+      <div class="font-bold text-lg">Test Cycle</div>
+      <div class="text-sm">Work: 10 secs · Rest: 20 secs</div>
+      <div class="text-xs mt-1">Test Only</div>
+    </button>
   {% endif %}
 
-  <div class="w-full max-w-xs space-y-2" {% if system_status.cut_off or (system_status.cut_off_end_time and user.role == 'Trainer') %}style="pointer-events: none; opacity: 0.5"{% endif %}>
-    {% if user.role == 'Trainer' %}
-      <button onclick="startTestCycle()" 
-        class="w-full p-4 rounded shadow text-left bg-purple-500 text-white hover:scale-[1.02] transition">
-        <div class="font-bold text-lg">Test Cycle</div>
-        <div class="text-sm">Work: 10 secs · Rest: 20 secs</div>
+  {% for key, z in zones.items() %}
+    {% if (user.role != 'Trainer') or (key != 'cut-off') %}
+      <button onclick="startZone('{{ key }}')"
+        class="w-full p-4 rounded shadow text-left
+        {% if key == 'white' %}bg-white text-black
+        {% elif key == 'green' %}bg-green-400 text-white
+        {% elif key == 'yellow' %}bg-yellow-300 text-black
+        {% elif key == 'red' %}bg-red-400 text-white
+        {% elif key == 'black' %}bg-black text-white
+        {% endif %}
+        hover:scale-[1.02] transition">
+        <div class="font-bold text-lg">{{ key.title() }}</div>
+        <div class="text-sm">Work: {{ z.work }} mins · Rest: {{ z.rest }} mins</div>
+        {% if key == 'white' %}
+          <div class="text-xs mt-1">29.9°C & Below</div>
+        {% elif key == 'green' %}
+          <div class="text-xs mt-1 text-green-800">30.0°C to 30.9°C</div>
+        {% elif key == 'yellow' %}
+          <div class="text-xs mt-1 text-yellow-800">31.0°C to 31.9°C</div>
+        {% elif key == 'red' %}
+          <div class="text-xs mt-1 text-red-100">32.0°C to 32.9°C</div>
+        {% elif key == 'black' %}
+          <div class="text-xs mt-1 text-gray-300">33.0°C to 34.9°C</div>
+        {% endif %}
       </button>
     {% endif %}
-
-    {% for key, z in zones.items() %}
-      {% if (user.role != 'Trainer') or (key != 'cut-off') %}
-        <button onclick="startZone('{{ key }}')"
-          class="w-full p-4 rounded shadow text-left
-          {% if key == 'white' %}bg-white text-black
-          {% elif key == 'green' %}bg-green-400 text-white
-          {% elif key == 'yellow' %}bg-yellow-300 text-black
-          {% elif key == 'red' %}bg-red-400 text-white
-          {% elif key == 'black' %}bg-black text-white
-          {% endif %}
-          hover:scale-[1.02] transition">
-          <div class="font-bold text-lg">{{ key.title() }}</div>
-          <div class="text-sm">Work: {{ z.work }} mins · Rest: {{ z.rest }} mins</div>
-        </button>
-      {% endif %}
-    {% endfor %}
-  </div>
+  {% endfor %}
+</div>
 </div>
 
 <script src="/static/notifications.js"></script>
@@ -96,8 +107,254 @@
   // Set the current user variable
   currentUser = "{{ username }}";
   userRole = "{{ user.role }}";
+  const socketio = socket;
 
-  // Rest of your dashboard.html JavaScript code...
+  // Ensure we reconnect if the connection is lost
+  socket.io.on("reconnect", (attempt) => {
+    console.log(`Socket.io reconnected after ${attempt} attempts`);
+    // Force a status refresh when reconnecting
+    fetchSystemStatus();
+  });
+
+  socket.io.on("reconnect_attempt", (attempt) => {
+    console.log(`Socket.io reconnection attempt: ${attempt}`);
+  });
+
+  socket.io.on("error", (error) => {
+    console.error("Socket.io error:", error);
+  });
+
+  // Check if socket.io is properly connected
+  socketio.on('connect', function() {
+    console.log('Socket.io connected successfully');
+    // Force a status refresh when initially connecting
+    fetchSystemStatus();
+  });
+
+  socketio.on('connect_error', function(error) {
+    console.error('Socket.io connection error:', error);
+  });
+
+  socketio.on('disconnect', function(reason) {
+    console.warn('Socket.io disconnected:', reason);
+
+    // Start periodic polling when disconnected
+    startPolling();
+  });
+
+  // This will log all incoming socket events for debugging
+  socketio.onAny((event, ...args) => {
+    console.log(`Received socket event: ${event}`, args);
+  });
+
+  // Add system status update handler
+  socketio.on('system_status_update', function(data) {
+    console.log("System status update received:", data);
+    updateSystemStatusUI(data);
+  });
+
+  // Add this to your script if not already present
+  socketio.on('force_refresh', function() {
+    console.log("Received force refresh command - reloading page");
+    location.reload();
+  });
+
+  socketio.on('user_update', function(data) {
+    console.log("User update received:", data);
+
+    // Check if current user data is available
+    if (data.users && data.users['{{ username }}']) {
+      const currentUser = data.users['{{ username }}'];
+      const stopButtonContainer = document.getElementById('stop-button-container');
+
+      // Hide stop button during rest
+      if (stopButtonContainer && currentUser.status === 'resting') {
+        stopButtonContainer.style.display = 'none';
+      }
+    }
+
+    // Update dashboard data
+    updateDashboard();
+  });
+
+  // Create a separate function to update the UI based on system status
+  function updateSystemStatusUI(data) {
+  console.log("Updating system status UI with:", data);
+
+  // Update UI based on system status
+  const zoneButtons = document.querySelector('.w-full.max-w-xs');
+  const zonesHeading = document.querySelector('h3.mt-6.text-lg.font-semibold');
+
+  // First, remove any existing notifications from the page
+  const existingCutOffWarning = document.querySelector('.bg-red-100');
+  if (existingCutOffWarning) {
+    existingCutOffWarning.remove();
+  }
+
+  const existingRestWarning = document.querySelector('.bg-yellow-100');
+  if (existingRestWarning) {
+    existingRestWarning.remove();
+  }
+  // Handle stop button visibility - check the user's status
+  const stopButtonContainer = document.getElementById('stop-button-container');
+  if (stopButtonContainer) {
+    // Get the current user status
+    fetch('/get_updates')
+      .then(response => response.json())
+      .then(userData => {
+        const currentUser = userData.users['{{ username }}'];
+        // Hide stop button during rest
+        if (currentUser && currentUser.status === 'resting') {
+          stopButtonContainer.style.display = 'none';
+        }
+      })
+      .catch(error => {
+        console.error('Error checking user status:', error);
+      });
+  }
+
+  // Handle cut-off mode
+  if (data.cut_off === true) {
+    console.log("Cut-off mode is active, updating UI");
+
+    // Create and insert the cut-off warning
+    const cutOffWarning = document.createElement('div');
+    cutOffWarning.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
+    cutOffWarning.innerHTML = `
+      <strong class="font-bold">Cut-Off Mode Active!</strong>
+      <p class="text-sm">All activities must stop. Please wait for further instructions.</p>
+    `;
+
+    // Insert in the right location
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(cutOffWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(cutOffWarning, zoneButtons);
+    }
+
+    // Disable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+
+    // Clear any active timer
+    if (window.timerInterval) {
+      clearTimer();
+      window.lastZone = null;
+      lastEndTime = null;
+    }
+
+    // Hide stop button if visible
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Handle mandatory rest period
+  else if (data.cut_off_end_time) {
+    console.log("Mandatory rest period is active, updating UI");
+
+    // Create and insert the rest warning
+    const restWarning = document.createElement('div');
+    restWarning.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4';
+
+    // Format the time for better readability
+    let endTime = new Date();
+    if (typeof data.cut_off_end_time === 'string') {
+      if (data.cut_off_end_time.includes(':')) {
+        // Time format like "18:40:35"
+        let timeParts = data.cut_off_end_time.split(':');
+        endTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2] || 0));
+      } else {
+        // ISO format or other date string
+        endTime = new Date(data.cut_off_end_time);
+      }
+    }
+    let formattedTime = endTime.toLocaleTimeString();
+
+    restWarning.innerHTML = `
+      <strong class="font-bold">Mandatory Rest Period</strong>
+      <p class="text-sm">Normal activities will resume after: ${formattedTime}</p>
+    `;
+
+    // Insert in the right location
+    if (zonesHeading && zonesHeading.nextElementSibling) {
+      zonesHeading.parentNode.insertBefore(restWarning, zonesHeading.nextElementSibling);
+    } else if (zoneButtons) {
+      zoneButtons.parentNode.insertBefore(restWarning, zoneButtons);
+    }
+
+    // Disable zone buttons for trainers
+    if (zoneButtons && '{{ user.role }}' === 'Trainer') {
+      zoneButtons.style.pointerEvents = 'none';
+      zoneButtons.style.opacity = '0.5';
+    }
+
+    // IMPORTANT CHANGE: Hide stop button during mandatory rest
+    if (stopButtonContainer) {
+      stopButtonContainer.style.display = 'none';
+    }
+  } 
+  // Normal operation - no warnings
+  else {
+    console.log("Normal operation, removing warnings");
+
+    // Re-enable zone buttons
+    if (zoneButtons) {
+      zoneButtons.style.pointerEvents = '';
+      zoneButtons.style.opacity = '';
+    }
+
+    // Make sure dashboard is updated with current state
+    if (!window.timerInterval) {
+      updateDashboard();
+    }
+
+    // Restore the stop button if there's an active timer
+    if (window.timerInterval && stopButtonContainer) {
+      stopButtonContainer.style.display = 'flex';
+    }
+  }
+}
+
+  // Fetch system status via AJAX as a fallback
+  function fetchSystemStatus() {
+    fetch('/get_system_status')
+      .then(response => response.json())
+      .then(data => {
+        console.log("Fetched system status:", data);
+        updateSystemStatusUI(data);
+      })
+      .catch(error => {
+        console.error("Error fetching system status:", error);
+      });
+  }
+
+  // Polling mechanism for when socket connection is lost
+  let pollingInterval = null;
+
+  function startPolling() {
+    if (!pollingInterval) {
+      console.log("Starting polling for updates");
+      pollingInterval = setInterval(fetchSystemStatus, 5000); // Poll every 5 seconds
+    }
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      console.log("Stopping polling for updates");
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  // When reconnected, stop polling
+  socketio.on('connect', function() {
+    stopPolling();
+  });
+
+  // Initial status check at page load
+  fetchSystemStatus();
 </script>
 <script>
 // Define updateDashboard function first so it's available for all function calls
@@ -106,7 +363,13 @@ function updateDashboard() {
     .then(response => response.json())
     .then(data => {
       const userData = data.users['{{ username }}'];
+      const systemStatus = data.system_status;
+
       if (userData) {
+        // Keep track of the current zone to detect changes
+        const currentZone = userData.zone;
+        const hasZoneChanged = window.lastZone !== currentZone;
+
         // Update zone display
         const zoneDisplay = document.getElementById('zone_name_display');
         if (zoneDisplay) {
@@ -139,33 +402,48 @@ function updateDashboard() {
 
         // Handle timer - MODIFIED PART
         if ((userData.status === 'working' || userData.status === 'resting') && userData.end_time) {
-          // Only start the timer if it's not already running or if the end time has changed
-          if (!timerInterval || lastEndTime !== userData.end_time) {
+          // Start the timer if:
+          // - timer is not running
+          // - end time has changed
+          // - zone has changed
+          if (!timerInterval || lastEndTime !== userData.end_time || hasZoneChanged) {
+            console.log("Restarting timer - Zone changed:", hasZoneChanged, "End time changed:", lastEndTime !== userData.end_time);
+
+            // Always clear the timer first to ensure clean state
+            clearTimer();
+
+            // Update the lastEndTime and lastZone
             lastEndTime = userData.end_time;
+            window.lastZone = currentZone;
+
+            // Start a new timer
             startTimer(userData.end_time);
           }
 
-          // Show stop button when cycle is active
+          // Show stop button ONLY if in work cycle, NOT in rest cycle
           const stopButtonContainer = document.getElementById('stop-button-container');
           if (stopButtonContainer) {
-            stopButtonContainer.style.display = 'flex';
+            // NEW CHECK: Only show button if in working state, not resting
+            if (userData.status === 'working' && !systemStatus.cut_off_end_time) {
+              stopButtonContainer.style.display = 'flex';
+            } else {
+              stopButtonContainer.style.display = 'none';
+            }
           }
         } else if (userData.status === 'idle') {
           clearTimer();
-
+          window.lastZone = null; // Reset the zone tracker
           // Hide stop button when idle
           const stopButtonContainer = document.getElementById('stop-button-container');
           if (stopButtonContainer) {
             stopButtonContainer.style.display = 'none';
           }
         }
-
         // Show rest prompt if work completed
         if (userData.work_completed && userData.pending_rest) {
           showRestPrompt();
         }
       }
-
       // Handle system status
       const zoneButtons = document.querySelector('.w-full.max-w-xs');
       if (zoneButtons) {
@@ -183,8 +461,9 @@ function updateDashboard() {
     });
 }
 
-// Add this variable at the top with your other global variables
+// Add these variables at the top with your other global variables
 let lastEndTime = null;
+window.lastZone = null; // Track the current zone to detect changes
 
 let currentPosition = null;
 let timerInterval = null;
@@ -210,28 +489,25 @@ let restPromptTimeout = null;
 let restNotificationInterval = null;
 
 function startTimer(endTimeStr) {
-  // If timer is already running with the same end time, don't restart it
-  if (timerInterval && lastEndTime === endTimeStr) {
-    return;
-  }
+  clearTimer(); // Make sure to clear any existing timer
 
-  clearTimer();
   if (!endTimeStr) return;
 
-  lastEndTime = endTimeStr;
   const endParts = endTimeStr.split(":");
   const end = new Date();
   end.setHours(parseInt(endParts[0]));
   end.setMinutes(parseInt(endParts[1]));
   end.setSeconds(parseInt(endParts[2]));
 
+  const now = new Date();
+
+  // Calculate total seconds from current time to end time
+  const totalSeconds = Math.max(0, Math.floor((end - now) / 1000));
+
   const progress = document.getElementById("progress-ring");
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
   progress.style.strokeDasharray = `${circumference}`;
-
-  const totalSeconds = Math.max(0, Math.floor((end - new Date()) / 1000));
-  let remainingSeconds = totalSeconds;
 
   // Update immediately before setting interval
   updateTimerDisplay(end, totalSeconds, circumference);
