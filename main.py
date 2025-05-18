@@ -208,20 +208,33 @@ def set_zone():
     if user_role == "Trainer" and target_user != username:
         return jsonify({"error": "Trainers can only set their own zone"}), 401
 
+    if zone is None:
+        return jsonify({"error": "Zone not specified"}), 400
+        
     work_duration = WBGT_ZONES[zone]["work"]
-    proposed_end = calculate_end(now, work_duration)
+    
+    # Reset seconds to zero for exact time tracking
+    now_exact = now.replace(microsecond=0, second=0)
+    proposed_end = calculate_end(now_exact, work_duration)
 
     if target_user in users and users[target_user].get("status") == "working":
         current_end_str = users[target_user]["end_time"]
         current_end_naive = datetime.strptime(current_end_str, "%H:%M:%S")
-        current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=current_end_naive.second)
+        current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=0)
         proposed_end = min(current_end, proposed_end)
 
+    # Format times with seconds set to zero
+    start_time_str = now_exact.strftime("%H:%M:%S")
+    end_time_str = proposed_end.strftime("%H:%M:%S")
+    
+    # Record activity with this exact same timestamp
+    log_activity(target_user, "start_work", zone, now_exact.strftime("%Y-%m-%d %H:%M:%S"))
+    
     users[target_user].update({
         "status": "working",
         "zone": zone,
-        "start_time": now.strftime("%H:%M:%S"),
-        "end_time": proposed_end.strftime("%H:%M:%S"),
+        "start_time": start_time_str,
+        "end_time": end_time_str,
         "location": request.form.get("location", None)
     })
 
@@ -456,9 +469,9 @@ def stop_cycle():
     users[username]["start_time"] = None
     users[username]["end_time"] = None
 
-    # Add to activity history
+    # Log the activity
     now = sg_now()
-    append_activity_history(username, "Work Cycle ended early by user", now.strftime("%H:%M:%S"))
+    log_activity(username, "early_completion", users[username].get("zone"))
 
     # Send real-time updates
     socketio.emit("user_update", {"users": users})
@@ -470,5 +483,5 @@ if __name__ == "__main__":
     # For local development only
     import os
     if os.environ.get('RENDER') != 'true':
-        socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+        socketio.run(app, host="0.0.0.0", port=5000, debug=True, use_reloader=True, log_output=True)
     # When deployed on Render, Gunicorn will call app directly
