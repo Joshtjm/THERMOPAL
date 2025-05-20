@@ -296,13 +296,12 @@ function startTimer(startTime, endTime, zone) {
   const timerElement = document.getElementById('timer');
   if (!timerElement) return;
   
-  // For the very first update, calculate and display the exact intended duration
-  // This ensures that when you start a cycle, you always see exactly the intended duration
-  // (e.g., exactly 60:00 for a white zone)
+  // IMPORTANT: When a cycle starts, we want to show the EXACT duration
+  // based on zone configuration, not based on time difference 
+  // This ensures the user sees exactly 60:00 for white zone, 45:00 for green zone, etc.
   
-  // Calculate exact minutes and seconds from the zone configuration
-  // rather than from time difference which might include extra seconds
-  let zoneConfig = {
+  // Hard-coded durations from the zone configuration
+  const zoneDurations = {
     'white': 60,
     'green': 45,
     'yellow': 30,
@@ -311,14 +310,25 @@ function startTimer(startTime, endTime, zone) {
     'test': 1
   };
   
-  // Get the exact minutes from zone configuration (fallback to calculated if zone not found)
-  const exactMinutes = zoneConfig[zone] || Math.floor((endDate - startDate) / 60000);
-  const exactSeconds = 0; // Always start with 0 seconds
+  // Get the current time
+  const now = new Date();
   
-  // Set initial display to the exact duration intended for the zone
-  timerElement.textContent = `${exactMinutes}:${exactSeconds.toString().padStart(2, '0')}`;
+  // Immediately set the timer to show the initial duration
+  // If we're just starting (within 2 seconds of start time), show exact zone duration
+  if (now - startDate < 2000) {
+    // Use the zone configuration to get exact minutes
+    const exactMinutes = zoneDurations[zone] || Math.floor((endDate - startDate) / 60000);
+    timerElement.textContent = `${exactMinutes}:00`;
+    console.log(`Starting timer for ${zone} zone: ${exactMinutes}:00`);
+  } else {
+    // Otherwise, calculate remaining time normally
+    const timeLeft = Math.max(0, endDate - now);
+    const minutes = Math.floor(timeLeft / 60000);
+    const seconds = Math.floor((timeLeft % 60000) / 1000);
+    timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
   
-  // For subsequent updates (after the first second), calculate based on current time
+  // For subsequent updates, calculate based on current time
   timerInterval = setInterval(() => {
     const now = new Date();
     
