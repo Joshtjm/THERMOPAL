@@ -296,20 +296,16 @@ function startTimer(startTime, endTime, zone) {
   const timerElement = document.getElementById('timer');
   if (!timerElement) return;
   
-  // Calculate initial exact duration in minutes and seconds
-  // This ensures we show the exact specified duration from the server
-  const totalDurationMs = endDate - startDate;
-  const exactMinutes = Math.floor(totalDurationMs / 60000);
-  const exactSeconds = Math.floor((totalDurationMs % 60000) / 1000);
+  // For the very first update, display the exact duration directly from the server
+  // This ensures that when you start a cycle, you see exactly the intended duration
+  const totalSeconds = Math.floor((endDate - startDate) / 1000);
+  const exactMinutes = Math.floor(totalSeconds / 60);
+  const exactSeconds = totalSeconds % 60;
   
-  // Set initial timer display to exact duration if we're just starting
-  const now = new Date();
-  // If we're within 1 second of the start time, show the exact duration
-  if (Math.abs(now - startDate) < 1000) {
-    timerElement.textContent = `${exactMinutes}:${exactSeconds.toString().padStart(2, '0')}`;
-  }
+  // Set initial display to the exact duration
+  timerElement.textContent = `${exactMinutes}:${exactSeconds.toString().padStart(2, '0')}`;
   
-  // Update timer every second
+  // For subsequent updates (after the first second), calculate based on current time
   timerInterval = setInterval(() => {
     const now = new Date();
     

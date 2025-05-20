@@ -46,9 +46,11 @@ def sg_now():
     return datetime.now(SG_TZ)
 
 def calculate_end(start, minutes):
-    # Calculate exact end time without extra seconds
-    # Using exact minutes to prevent any extra seconds in the duration
-    return start + timedelta(minutes=minutes, seconds=0)
+    # Calculate exact end time without any extra seconds
+    # First normalize the start time to remove any seconds/microseconds
+    normalized_start = start.replace(microsecond=0, second=0)
+    # Add exactly the number of minutes specified
+    return normalized_start + timedelta(minutes=minutes)
 
 def save_locations():
     with open('locations.json', 'w') as f:
@@ -214,16 +216,22 @@ def set_zone():
     work_duration = WBGT_ZONES[zone]["work"]
     
     # Reset seconds to zero for exact time tracking
+    # This ensures the timer will always show exactly the specified duration
     now_exact = now.replace(microsecond=0, second=0)
+    
+    # Calculate the exact end time based on the work duration
+    # This will ensure that the duration is exactly as specified in the zone
     proposed_end = calculate_end(now_exact, work_duration)
-
+    
+    # If the user is already working, don't extend their cycle
     if target_user in users and users[target_user].get("status") == "working":
         current_end_str = users[target_user]["end_time"]
         current_end_naive = datetime.strptime(current_end_str, "%H:%M:%S")
         current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=0)
         proposed_end = min(current_end, proposed_end)
-
-    # Format times with seconds set to zero
+    
+    # Format times with exactly zero seconds to ensure precise durations
+    # This ensures the activity time matches the exact start time
     start_time_str = now_exact.strftime("%H:%M:%S")
     end_time_str = proposed_end.strftime("%H:%M:%S")
     
@@ -305,19 +313,24 @@ def start_rest():
     if not zone:
         return jsonify({"error": "No active WBGT zone"}), 400
 
-    # Set rest duration based on zone with exact timing
     # Reset seconds to zero for exact time tracking
+    # This ensures the timer will always show exactly the specified duration
     now_exact = now.replace(microsecond=0, second=0)
     
+    # Calculate the rest duration precisely
     if zone == "test":
+        # For test cycles, use seconds
         rest_seconds = 20
+        # Even for test cycles, we start with zero seconds
         end_time_obj = now_exact + timedelta(seconds=rest_seconds)
     else:
+        # For normal zones, use the exact minutes from the configuration
         rest_minutes = WBGT_ZONES[zone]["rest"]
-        # Use the calculate_end function for exact minutes timing
+        # Calculate the exact end time with the normalized start time
         end_time_obj = calculate_end(now_exact, rest_minutes)
     
-    # Format times with consistent precision
+    # Format times with exactly zero seconds to ensure precise durations
+    # This ensures the activity time matches the exact start time
     start_time = now_exact.strftime("%H:%M:%S")
     end_time = end_time_obj.strftime("%H:%M:%S")
 
