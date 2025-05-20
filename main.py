@@ -29,16 +29,31 @@ locations = {}
 history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
-def log_activity(username, action, zone=None):
-    timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S %z")
+def log_activity(username, action, zone=None, custom_timestamp=None, details=None):
+    # Use custom timestamp if provided, otherwise use current time
+    if custom_timestamp:
+        timestamp = custom_timestamp
+    else:
+        # Format without timezone info to match the display format in the UI
+        timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Print for debugging
+    print(f"Logging activity: {username}, {action}, zone: {zone}, time: {timestamp}")
+    
     try:
-        history_log.append({
+        activity_entry = {
             "timestamp": timestamp,
             "username": username,
             "action": action,
             "zone": zone
-        })
-        socketio.emit('history_update', {'history': history_log})
+        }
+        
+        # Add details if provided
+        if details:
+            activity_entry["details"] = details
+            
+        history_log.append(activity_entry)
+        socketio.emit('history_update', {'history': history_log[-10:]})  # Send just the last 10 entries
     except Exception as e:
         print(f"Error logging activity: {e}")
 
@@ -218,11 +233,19 @@ def set_zone():
         current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=current_end_naive.second)
         proposed_end = min(current_end, proposed_end)
 
+    # Record the exact time when the user starts the cycle
+    start_time = now.strftime("%H:%M:%S")
+    end_time = proposed_end.strftime("%H:%M:%S")
+    
+    # Log the activity with the correct timestamp to match when they started
+    log_activity(target_user, "start_work", zone)
+    
+    # Update user status
     users[target_user].update({
         "status": "working",
         "zone": zone,
-        "start_time": now.strftime("%H:%M:%S"),
-        "end_time": proposed_end.strftime("%H:%M:%S"),
+        "start_time": start_time,
+        "end_time": end_time,
         "location": request.form.get("location", None)
     })
 
@@ -457,9 +480,8 @@ def stop_cycle():
     users[username]["start_time"] = None
     users[username]["end_time"] = None
 
-    # Add to activity history
-    now = sg_now()
-    append_activity_history(username, "Work Cycle ended early by user", now.strftime("%H:%M:%S"))
+    # Add to activity history using the log_activity function
+    log_activity(username, "early_completion", users[username].get("zone"))
 
     # Send real-time updates
     socketio.emit("user_update", {"users": users})
