@@ -296,13 +296,26 @@ function startTimer(startTime, endTime, zone) {
   const timerElement = document.getElementById('timer');
   if (!timerElement) return;
   
-  // For the very first update, display the exact duration directly from the server
-  // This ensures that when you start a cycle, you see exactly the intended duration
-  const totalSeconds = Math.floor((endDate - startDate) / 1000);
-  const exactMinutes = Math.floor(totalSeconds / 60);
-  const exactSeconds = totalSeconds % 60;
+  // For the very first update, calculate and display the exact intended duration
+  // This ensures that when you start a cycle, you always see exactly the intended duration
+  // (e.g., exactly 60:00 for a white zone)
   
-  // Set initial display to the exact duration
+  // Calculate exact minutes and seconds from the zone configuration
+  // rather than from time difference which might include extra seconds
+  let zoneConfig = {
+    'white': 60,
+    'green': 45,
+    'yellow': 30,
+    'red': 30,
+    'black': 15,
+    'test': 1
+  };
+  
+  // Get the exact minutes from zone configuration (fallback to calculated if zone not found)
+  const exactMinutes = zoneConfig[zone] || Math.floor((endDate - startDate) / 60000);
+  const exactSeconds = 0; // Always start with 0 seconds
+  
+  // Set initial display to the exact duration intended for the zone
   timerElement.textContent = `${exactMinutes}:${exactSeconds.toString().padStart(2, '0')}`;
   
   // For subsequent updates (after the first second), calculate based on current time

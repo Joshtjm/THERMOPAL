@@ -43,14 +43,25 @@ def is_authority(role):
     return role == "Conducting Body"
 
 def sg_now():
+    # Return current time in SG timezone
     return datetime.now(SG_TZ)
 
+def sg_now_exact():
+    # Return current time with seconds and microseconds set to zero for exact timing
+    now = datetime.now(SG_TZ)
+    return now.replace(microsecond=0, second=0)
+
+def format_datetime(dt):
+    # Standard format for datetime objects
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def format_time(dt):
+    # Format for time display (hours:minutes:seconds)
+    return dt.strftime("%H:%M:%S")
+
 def calculate_end(start, minutes):
-    # Calculate exact end time without any extra seconds
-    # First normalize the start time to remove any seconds/microseconds
-    normalized_start = start.replace(microsecond=0, second=0)
-    # Add exactly the number of minutes specified
-    return normalized_start + timedelta(minutes=minutes)
+    # Calculate exact end time with precise minutes
+    return start + timedelta(minutes=minutes)
 
 def save_locations():
     with open('locations.json', 'w') as f:
@@ -235,8 +246,9 @@ def set_zone():
     start_time_str = now_exact.strftime("%H:%M:%S")
     end_time_str = proposed_end.strftime("%H:%M:%S")
     
-    # Record activity with this exact same timestamp
-    log_activity(target_user, "start_work", zone, now_exact.strftime("%Y-%m-%d %H:%M:%S"))
+    # Record activity with the current time (not rounded)
+    # This ensures the activity log shows the actual time when the user started their cycle
+    log_activity(target_user, "start_work", zone)
     
     users[target_user].update({
         "status": "working",
