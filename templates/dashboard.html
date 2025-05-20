@@ -812,8 +812,14 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPosition = position;
         updateLocationDisplay();
       },
-      error => console.error('Geolocation error:', error)
+      error => {
+        console.error('Geolocation error:', error);
+        document.getElementById('current_location').textContent = 'Location unavailable';
+      },
+      { timeout: 10000, enableHighAccuracy: true }
     );
+  } else {
+    document.getElementById('current_location').textContent = 'Geolocation not supported';
   }
 
   // Add event listener for stop button if it exists

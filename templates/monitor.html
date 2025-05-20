@@ -139,9 +139,16 @@
     userRole = "{{ role }}";
 
     // Use the socket from notifications.js instead of creating a new one
-    socket.on('history_update', (data) => {
+    // Clean up old listeners when setting new ones
+if (window.historyUpdateListener) {
+  socket.off('history_update', window.historyUpdateListener);
+}
+
+window.historyUpdateListener = (data) => {
   const tbody = document.querySelector('#history-table tbody');
-  tbody.innerHTML = data.history.map(entry => `
+  if (!tbody) return;
+
+  tbody.innerHTML = (data.history || []).map(entry => `
     <tr>
       <td class="px-4 py-3 text-sm">${entry.timestamp}</td>
       <td class="px-4 py-3 text-sm">${entry.username}</td>

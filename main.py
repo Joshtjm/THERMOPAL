@@ -30,37 +30,33 @@ history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
 def log_activity(username, action, zone=None, custom_timestamp=None):
-    # Use custom timestamp if provided, otherwise use current time
-    timestamp = custom_timestamp or datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    history_log.append({
-        "timestamp": timestamp,
-        "username": username,
-        "action": action,
-        "zone": zone
-    })
+    # If a custom timestamp is provided, use it, otherwise use current time
+    if custom_timestamp:
+        timestamp = custom_timestamp
+    else:
+        # Use the same time display format that appears in the dashboard
+        timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Add to history log and emit
+    try:
+        print(f"Logging activity for {username}: {action}, zone: {zone}, time: {timestamp}")
+        history_log.append({
+            "timestamp": timestamp,
+            "username": username,
+            "action": action,
+            "zone": zone
+        })
+        socketio.emit('history_update', {'history': history_log[-10:]})
+    except Exception as e:
+        print(f"Error logging activity: {e}")
 
 def is_authority(role):
     return role == "Conducting Body"
 
 def sg_now():
-    # Return current time in SG timezone
     return datetime.now(SG_TZ)
 
-def sg_now_exact():
-    # Return current time with seconds and microseconds set to zero for exact timing
-    now = datetime.now(SG_TZ)
-    return now.replace(microsecond=0, second=0)
-
-def format_datetime(dt):
-    # Standard format for datetime objects
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-def format_time(dt):
-    # Format for time display (hours:minutes:seconds)
-    return dt.strftime("%H:%M:%S")
-
 def calculate_end(start, minutes):
-    # Calculate exact end time with precise minutes
     return start + timedelta(minutes=minutes)
 
 def save_locations():
@@ -221,40 +217,20 @@ def set_zone():
     if user_role == "Trainer" and target_user != username:
         return jsonify({"error": "Trainers can only set their own zone"}), 401
 
-    if zone is None:
-        return jsonify({"error": "Zone not specified"}), 400
-        
     work_duration = WBGT_ZONES[zone]["work"]
-    
-    # Reset seconds to zero for exact time tracking
-    # This ensures the timer will always show exactly the specified duration
-    now_exact = now.replace(microsecond=0, second=0)
-    
-    # Calculate the exact end time based on the work duration
-    # This will ensure that the duration is exactly as specified in the zone
-    proposed_end = calculate_end(now_exact, work_duration)
-    
-    # If the user is already working, don't extend their cycle
+    proposed_end = calculate_end(now, work_duration)
+
     if target_user in users and users[target_user].get("status") == "working":
         current_end_str = users[target_user]["end_time"]
         current_end_naive = datetime.strptime(current_end_str, "%H:%M:%S")
-        current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=0)
+        current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=current_end_naive.second)
         proposed_end = min(current_end, proposed_end)
-    
-    # Format times with exactly zero seconds to ensure precise durations
-    # This ensures the activity time matches the exact start time
-    start_time_str = now_exact.strftime("%H:%M:%S")
-    end_time_str = proposed_end.strftime("%H:%M:%S")
-    
-    # Record activity with the current time (not rounded)
-    # This ensures the activity log shows the actual time when the user started their cycle
-    log_activity(target_user, "start_work", zone)
-    
+
     users[target_user].update({
         "status": "working",
         "zone": zone,
-        "start_time": start_time_str,
-        "end_time": end_time_str,
+        "start_time": now.strftime("%H:%M:%S"),
+        "end_time": proposed_end.strftime("%H:%M:%S"),
         "location": request.form.get("location", None)
     })
 
@@ -325,26 +301,15 @@ def start_rest():
     if not zone:
         return jsonify({"error": "No active WBGT zone"}), 400
 
-    # Reset seconds to zero for exact time tracking
-    # This ensures the timer will always show exactly the specified duration
-    now_exact = now.replace(microsecond=0, second=0)
-    
-    # Calculate the rest duration precisely
+    # Set rest duration based on zone
     if zone == "test":
-        # For test cycles, use seconds
         rest_seconds = 20
-        # Even for test cycles, we start with zero seconds
-        end_time_obj = now_exact + timedelta(seconds=rest_seconds)
+        end_time = (now + timedelta(seconds=rest_seconds)).strftime("%H:%M:%S")
     else:
-        # For normal zones, use the exact minutes from the configuration
         rest_minutes = WBGT_ZONES[zone]["rest"]
-        # Calculate the exact end time with the normalized start time
-        end_time_obj = calculate_end(now_exact, rest_minutes)
-    
-    # Format times with exactly zero seconds to ensure precise durations
-    # This ensures the activity time matches the exact start time
-    start_time = now_exact.strftime("%H:%M:%S")
-    end_time = end_time_obj.strftime("%H:%M:%S")
+        end_time = (now + timedelta(minutes=rest_minutes)).strftime("%H:%M:%S")
+
+    start_time = now.strftime("%H:%M:%S")
 
     # Update user status to resting
     users[username].update({
@@ -355,8 +320,7 @@ def start_rest():
         "pending_rest": False
     })
 
-    # Log the activity with the exact same timestamp as the start time
-    log_activity(username, "start_rest", zone, now_exact.strftime("%Y-%m-%d %H:%M:%S"))
+    log_activity(username, "start_rest", zone)
 
     print(f"Rest cycle started for {username}: {start_time} to {end_time}")
 
@@ -501,9 +465,9 @@ def stop_cycle():
     users[username]["start_time"] = None
     users[username]["end_time"] = None
 
-    # Log the activity
+    # Add to activity history
     now = sg_now()
-    log_activity(username, "early_completion", users[username].get("zone"))
+    log_activity(username, "early_completion", users[username].get("zone"), details="Early completion by user")
 
     # Send real-time updates
     socketio.emit("user_update", {"users": users})
