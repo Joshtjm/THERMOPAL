@@ -440,18 +440,9 @@ def complete_cycle_early():
         users[username]['start_time'] = None
         users[username]['end_time'] = None
 
-        # Add to activity history
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        history_log.append({  
-            'timestamp': timestamp,
-            'username': username,
-            'action': 'early_completion',
-            'zone': current_zone,
-            'details': 'Early completion by user'
-        })
-
-        # Broadcast the update
-        socketio.emit('history_update', {'history': history_log}) 
+        # Use log_activity for consistent timezone handling
+        log_activity(username, 'early_completion', current_zone, 
+                   details='Early completion by user') 
 
         return jsonify({'success': True})
 
@@ -480,8 +471,10 @@ def stop_cycle():
     users[username]["start_time"] = None
     users[username]["end_time"] = None
 
-    # Add to activity history using the log_activity function
-    log_activity(username, "early_completion", users[username].get("zone"))
+    # Add to activity history using the log_activity function with correct timestamp format
+    # Create detailed message for early completion
+    log_activity(username, "early_completion", users[username].get("zone"), 
+                details="Early completion by user")
 
     # Send real-time updates
     socketio.emit("user_update", {"users": users})
