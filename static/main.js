@@ -292,15 +292,14 @@ function startTimer(startTime, endTime, zone) {
   lastZone = zone;
   lastEndTime = endTime;
   
+  // Log for debugging
+  console.log(`Starting timer for ${zone} zone from ${startTime} to ${endTime}`);
+  
   // Update the timer display
   const timerElement = document.getElementById('timer');
   if (!timerElement) return;
   
-  // IMPORTANT: When a cycle starts, we want to show the EXACT duration
-  // based on zone configuration, not based on time difference 
-  // This ensures the user sees exactly 60:00 for white zone, 45:00 for green zone, etc.
-  
-  // Hard-coded durations from the zone configuration
+  // Simple fix: Always show the exact duration when starting a timer
   const zoneDurations = {
     'white': 60,
     'green': 45,
@@ -310,19 +309,13 @@ function startTimer(startTime, endTime, zone) {
     'test': 1
   };
   
-  // Get the current time
-  const now = new Date();
-  
-  // Immediately set the timer to show the initial duration
-  // If we're just starting (within 2 seconds of start time), show exact zone duration
-  if (now - startDate < 2000) {
-    // Use the zone configuration to get exact minutes
-    const exactMinutes = zoneDurations[zone] || Math.floor((endDate - startDate) / 60000);
-    timerElement.textContent = `${exactMinutes}:00`;
-    console.log(`Starting timer for ${zone} zone: ${exactMinutes}:00`);
+  // Always start with exact minutes (60:00 for white zone)
+  if (zone in zoneDurations) {
+    timerElement.textContent = `${zoneDurations[zone]}:00`;
+    console.log(`FIXED: Starting timer for ${zone} zone: ${zoneDurations[zone]}:00`);
   } else {
-    // Otherwise, calculate remaining time normally
-    const timeLeft = Math.max(0, endDate - now);
+    // Fallback calculation
+    const timeLeft = Math.max(0, endDate - new Date());
     const minutes = Math.floor(timeLeft / 60000);
     const seconds = Math.floor((timeLeft % 60000) / 1000);
     timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;

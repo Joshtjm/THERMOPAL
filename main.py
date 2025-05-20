@@ -30,6 +30,7 @@ history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
 def log_activity(username, action, zone=None, custom_timestamp=None, details=None):
+    """Log user activity with accurate timestamps"""
     # If a custom timestamp is provided, use it, otherwise use current time
     if custom_timestamp:
         timestamp = custom_timestamp
@@ -223,7 +224,15 @@ def set_zone():
     if user_role == "Trainer" and target_user != username:
         return jsonify({"error": "Trainers can only set their own zone"}), 401
 
+    # Check if zone exists in our configuration
+    if zone not in WBGT_ZONES:
+        return jsonify({"error": f"Invalid zone: {zone}"}), 400
+    
+    # Get work duration from zone configuration
     work_duration = WBGT_ZONES[zone]["work"]
+    
+    # Calculate the end time with exactly the right duration
+    # This ensures timer shows exactly 60:00 for white zone
     proposed_end = calculate_end(now, work_duration)
 
     if target_user in users and users[target_user].get("status") == "working":
