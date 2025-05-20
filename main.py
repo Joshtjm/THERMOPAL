@@ -29,31 +29,16 @@ locations = {}
 history_log = []
 system_status = {"cut_off": False, "cut_off_end_time": None}
 
-def log_activity(username, action, zone=None, custom_timestamp=None, details=None):
-    """Log user activity with accurate timestamps"""
-    # If a custom timestamp is provided, use it, otherwise use current time
-    if custom_timestamp:
-        timestamp = custom_timestamp
-    else:
-        # Use CURRENT TIME in the dashboard format
-        timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Add to history log and emit
+def log_activity(username, action, zone=None):
+    timestamp = datetime.now(SG_TZ).strftime("%Y-%m-%d %H:%M:%S %z")
     try:
-        print(f"Logging activity for {username}: {action}, zone: {zone}, time: {timestamp}")
-        activity = {
+        history_log.append({
             "timestamp": timestamp,
             "username": username,
             "action": action,
             "zone": zone
-        }
-        
-        # Add details if provided
-        if details:
-            activity["details"] = details
-            
-        history_log.append(activity)
-        socketio.emit('history_update', {'history': history_log[-10:]})
+        })
+        socketio.emit('history_update', {'history': history_log})
     except Exception as e:
         print(f"Error logging activity: {e}")
 
@@ -224,15 +209,7 @@ def set_zone():
     if user_role == "Trainer" and target_user != username:
         return jsonify({"error": "Trainers can only set their own zone"}), 401
 
-    # Check if zone exists in our configuration
-    if zone not in WBGT_ZONES:
-        return jsonify({"error": f"Invalid zone: {zone}"}), 400
-    
-    # Get work duration from zone configuration
     work_duration = WBGT_ZONES[zone]["work"]
-    
-    # Calculate the end time with exactly the right duration
-    # This ensures timer shows exactly 60:00 for white zone
     proposed_end = calculate_end(now, work_duration)
 
     if target_user in users and users[target_user].get("status") == "working":
@@ -241,23 +218,13 @@ def set_zone():
         current_end = now.replace(hour=current_end_naive.hour, minute=current_end_naive.minute, second=current_end_naive.second)
         proposed_end = min(current_end, proposed_end)
 
-    # Log this activity first with the current timestamp
-    log_activity(target_user, "start_work", zone)
-    
-    # Format the time to display in the UI
-    start_time = now.strftime("%H:%M:%S")
-    end_time = proposed_end.strftime("%H:%M:%S")
-    
-    # Update user status with the times
     users[target_user].update({
         "status": "working",
         "zone": zone,
-        "start_time": start_time,
-        "end_time": end_time,
+        "start_time": now.strftime("%H:%M:%S"),
+        "end_time": proposed_end.strftime("%H:%M:%S"),
         "location": request.form.get("location", None)
     })
-    
-    print(f"Zone set: {zone} for {target_user}, start: {start_time}, end: {end_time}")
 
     return jsonify({
         "success": True,
@@ -492,7 +459,7 @@ def stop_cycle():
 
     # Add to activity history
     now = sg_now()
-    log_activity(username, "early_completion", users[username].get("zone"), details="Cycle ended early by user")
+    append_activity_history(username, "Work Cycle ended early by user", now.strftime("%H:%M:%S"))
 
     # Send real-time updates
     socketio.emit("user_update", {"users": users})
@@ -504,5 +471,5 @@ if __name__ == "__main__":
     # For local development only
     import os
     if os.environ.get('RENDER') != 'true':
-        socketio.run(app, host="0.0.0.0", port=5000, debug=True, use_reloader=True, log_output=True)
+        socketio.run(app, host="0.0.0.0", port=5000, debug=True)
     # When deployed on Render, Gunicorn will call app directly

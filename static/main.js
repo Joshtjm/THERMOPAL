@@ -321,7 +321,11 @@ function startTimer(startTime, endTime, zone) {
     timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
   
-  // For subsequent updates, calculate based on current time
+  // TIMER FIX: For first second, always show exact zone duration (60:00 for white)
+  // This ensures the timer always starts with the exact zone duration
+  const zoneDuration = zoneDurations[zone] || 0;
+  
+  // For subsequent updates (after first display), calculate based on current time
   timerInterval = setInterval(() => {
     const now = new Date();
     
